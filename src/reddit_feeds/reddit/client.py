@@ -27,4 +27,13 @@ def _parse_post(data: dict) -> RedditPost:
 
 async def fetch_posts(url: str, limit: int, client: httpx.AsyncClient) -> list[RedditPost]:
     """Fetch posts from a Reddit JSON feed URL."""
-    raise NotImplementedError
+    sep = "&" if "?" in url else "?"
+    full_url = f"{url}{sep}limit={limit}"
+    response = await client.get(
+        full_url,
+        headers={"User-Agent": USER_AGENT},
+        timeout=TIMEOUT,
+    )
+    response.raise_for_status()
+    children = response.json()["data"]["children"]
+    return [_parse_post(child["data"]) for child in children]
