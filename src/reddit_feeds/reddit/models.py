@@ -1,3 +1,5 @@
+"""Reddit post data model."""
+
 from dataclasses import dataclass
 
 

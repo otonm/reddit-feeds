@@ -1,3 +1,5 @@
+"""Reddit JSON API client."""
+
 import logging
 
 import httpx
