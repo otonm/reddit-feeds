@@ -33,7 +33,7 @@ Settings
 FeedConfig
   name: str
   url: HttpUrl
-  fetch_items: int          (default: 20, clamped 1–100)
+  fetch_items: int          (default: 20, validated: must be 1–100 — config error if outside range)
 ```
 
 Top-level fields (`output_dir`, `interval`) are overridable via env vars prefixed `REDDIT_FEEDS_` (e.g., `REDDIT_FEEDS_INTERVAL=300`). Feed-level fields are config-file-only.
@@ -153,7 +153,7 @@ Returns RSS 2.0 XML string.
 | `link` | `https://reddit.com{permalink}` |
 | `pubDate` | from `created_utc` |
 | `guid` | `https://reddit.com{permalink}` |
-| `description` | All media as `<img src="...">` (or `<video src="...">` for video files) |
+| `description` | All media as `<img src="...">` tags; `.mp4`/`.webm` URLs wrapped in `<video src="...">` instead |
 | `enclosure` | First media URL, MIME type inferred from extension |
 
 #### MIME type inference
