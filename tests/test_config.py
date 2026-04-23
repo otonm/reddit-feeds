@@ -88,8 +88,6 @@ class TestLoadSettings:
 
     def test_invalid_fetch_items_raises_on_load(self, tmp_path):
         config = tmp_path / "config.yaml"
-        config.write_text(
-            "feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n    fetch_items: 200\n"
-        )
+        config.write_text("feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n    fetch_items: 200\n")
         with pytest.raises(ValidationError):
             load_settings(config)

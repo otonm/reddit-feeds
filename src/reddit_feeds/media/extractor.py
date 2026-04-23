@@ -53,9 +53,7 @@ def _try_gallery_dl(url: str) -> tuple[list[str], bool]:
 
         urls: list[str] = []
         try:
-            urls.extend(
-                message[1] for message in extractor if message[0] == _GALLERY_DL_URL_MESSAGE
-            )
+            urls.extend(message[1] for message in extractor if message[0] == _GALLERY_DL_URL_MESSAGE)
         except Exception:  # noqa: BLE001
             logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
             return [], False

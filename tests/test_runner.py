@@ -3,10 +3,8 @@ from unittest.mock import AsyncMock, patch
 
 import feedparser
 import httpx
-import pytest
 
 from reddit_feeds.config.models import FeedConfig, Settings
-from reddit_feeds.feed.models import MediaPost
 from reddit_feeds.reddit.models import RedditPost
 from reddit_feeds.runner import process_feed, run_once
 
@@ -42,7 +40,9 @@ class TestProcessFeed:
 
         with (
             patch("reddit_feeds.runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("reddit_feeds.runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])),
+            patch(
+                "reddit_feeds.runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
+            ),
         ):
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client)

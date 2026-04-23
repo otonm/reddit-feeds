@@ -1,5 +1,4 @@
 import feedparser
-import pytest
 
 from reddit_feeds.config.models import FeedConfig
 from reddit_feeds.feed.builder import _infer_mime, build_feed

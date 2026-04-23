@@ -18,6 +18,9 @@ dependencies = [
 [project.scripts]
 reddit-feeds = "reddit_feeds.cli:main"
 
+[tool.uv]
+package = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
@@ -45,7 +48,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/reddit_feeds/config/loader.py" = ["TC003", "TC001"]
-"tests/**/*.py" = ["S101", "ANN", "D101", "D102", "D103", "D400", "D403", "D415", "INP001", "SIM117", "S314", "SLF001", "PLR2004", "ARG001", "PLC0415"]
+"tests/**/*.py" = ["S101", "ANN", "D100", "D101", "D102", "D103", "D400", "D403", "D415", "INP001", "SIM117", "S314", "SLF001", "PLR2004", "ARG001", "PLC0415", "EM101"]
 
 [dependency-groups]
 dev = [

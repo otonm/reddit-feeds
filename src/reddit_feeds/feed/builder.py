@@ -1,7 +1,7 @@
 """RSS 2.0 feed builder."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from urllib.parse import urlparse
 
 from feedgen.feed import FeedGenerator
@@ -59,7 +59,7 @@ def build_feed(feed_config: FeedConfig, posts: list[MediaPost]) -> str:
         fe.id(mp.post.permalink)
         fe.title(mp.post.title)
         fe.link(href=mp.post.permalink)
-        fe.published(datetime.fromtimestamp(mp.post.created_utc, tz=timezone.utc))
+        fe.published(datetime.fromtimestamp(mp.post.created_utc, tz=UTC))
         fe.description(_build_description(mp.media_urls))
 
         if mp.media_urls:

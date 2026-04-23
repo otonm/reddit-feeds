@@ -29,7 +29,7 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
     logger.info("[%s] Fetching %d posts from %s", feed.name, feed.fetch_items, feed.url)
     try:
         posts = await fetch_posts(feed.url, feed.fetch_items, client)
-    except Exception:
+    except Exception:  # noqa: BLE001
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)
         return
 
@@ -41,7 +41,7 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
                 media_posts.append(MediaPost(post=post, media_urls=urls))
             else:
                 logger.debug("[%s] Skipping post %s: no media", feed.name, post.id)
-        except Exception:
+        except Exception:  # noqa: BLE001
             logger.warning("[%s] Extraction failed for post %s", feed.name, post.id, exc_info=True)
 
     logger.info("[%s] %d/%d posts have media", feed.name, len(media_posts), len(posts))
@@ -51,4 +51,4 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
         await write_feed(xml, feed, settings.output_dir)
         logger.info("[%s] Feed written to %s/%s.xml", feed.name, settings.output_dir, feed.name)
     except Exception:
-        logger.error("[%s] Failed to write feed", feed.name, exc_info=True)
+        logger.exception("[%s] Failed to write feed", feed.name)

@@ -24,9 +24,7 @@ def make_post(**kwargs) -> RedditPost:
 def make_mock_extractor(url_messages: list[str]) -> MagicMock:
     """Build a mock gallery-dl extractor that yields Message.Url tuples."""
     mock = MagicMock()
-    mock.__iter__ = MagicMock(
-        return_value=iter([(3, url, {}) for url in url_messages])
-    )
+    mock.__iter__ = MagicMock(return_value=iter([(3, url, {}) for url in url_messages]))
     return mock
 
 
@@ -46,10 +44,12 @@ class TestExtractMediaUrls:
             is_gallery=True,
             post_hint=None,
         )
-        mock_extractor = make_mock_extractor([
-            "https://i.redd.it/img1.jpg",
-            "https://i.redd.it/img2.jpg",
-        ])
+        mock_extractor = make_mock_extractor(
+            [
+                "https://i.redd.it/img1.jpg",
+                "https://i.redd.it/img2.jpg",
+            ]
+        )
 
         with patch("gallery_dl.extractor.find", return_value=mock_extractor):
             urls = extract_media_urls(post)
@@ -102,10 +102,14 @@ class TestExtractMediaUrls:
         """Message type 1 (Directory) and 2 (Queue) should not be added to urls."""
         post = make_post(url="https://i.redd.it/abc.jpg", post_hint="image")
         mock_extractor = MagicMock()
-        mock_extractor.__iter__ = MagicMock(return_value=iter([
-            (1, {"category": "reddit"}, {}),
-            (3, "https://i.redd.it/abc.jpg", {}),
-        ]))
+        mock_extractor.__iter__ = MagicMock(
+            return_value=iter(
+                [
+                    (1, {"category": "reddit"}, {}),
+                    (3, "https://i.redd.it/abc.jpg", {}),
+                ]
+            )
+        )
 
         with patch("gallery_dl.extractor.find", return_value=mock_extractor):
             urls = extract_media_urls(post)
