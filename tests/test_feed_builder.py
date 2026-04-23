@@ -4,6 +4,7 @@ import pytest
 from reddit_feeds.config.models import FeedConfig
 from reddit_feeds.feed.builder import _infer_mime, build_feed
 from reddit_feeds.feed.models import MediaPost
+from reddit_feeds.feed.writer import write_feed
 from reddit_feeds.reddit.models import RedditPost
 
 
@@ -116,3 +117,34 @@ class TestInferMime:
 
     def test_url_with_query_string(self):
         assert _infer_mime("https://example.com/img.jpg?size=large") == "image/jpeg"
+
+
+class TestWriteFeed:
+    async def test_write_feed_creates_file(self, tmp_path):
+        config = make_feed_config("python")
+        await write_feed("<rss/>", config, tmp_path)
+        assert (tmp_path / "python.xml").exists()
+
+    async def test_write_feed_content_matches(self, tmp_path):
+        config = make_feed_config("python")
+        xml = "<rss><channel><title>r/python</title></channel></rss>"
+        await write_feed(xml, config, tmp_path)
+        content = (tmp_path / "python.xml").read_text()
+        assert content == xml
+
+    async def test_write_feed_slugifies_name(self, tmp_path):
+        config = make_feed_config("My Feed Name!")
+        await write_feed("<rss/>", config, tmp_path)
+        assert (tmp_path / "my-feed-name.xml").exists()
+
+    async def test_write_feed_creates_output_dir_if_missing(self, tmp_path):
+        nested = tmp_path / "a" / "b" / "feeds"
+        config = make_feed_config("python")
+        await write_feed("<rss/>", config, nested)
+        assert (nested / "python.xml").exists()
+
+    async def test_write_feed_overwrites_existing(self, tmp_path):
+        config = make_feed_config("python")
+        (tmp_path / "python.xml").write_text("old content")
+        await write_feed("new content", config, tmp_path)
+        assert (tmp_path / "python.xml").read_text() == "new content"
