@@ -32,17 +32,19 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+    "BLE001",
+    "COM812",
+    "D104",
     "D107",
     "D203",
     "D213",
-    "TRY003",
     "EM102",
+    "ERA001",
+    "FBT002",
     "G004",
     "PLR0913",
-    "ERA001",
-    "COM812",
-    "D104",
     "T201",
+    "TRY003",
     "TRY400",
 ]
 

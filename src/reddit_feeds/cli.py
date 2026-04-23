@@ -21,7 +21,7 @@ def run(
         Path,
         typer.Option("--config", "-c", help="Path to config.yaml"),
     ] = Path("config.yaml"),
-    daemon: Annotated[  # noqa: FBT002
+    daemon: Annotated[
         bool,
         typer.Option("--daemon", "-d", help="Run continuously, sleeping interval seconds between runs"),
     ] = False,

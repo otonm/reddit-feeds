@@ -43,10 +43,11 @@ class TestSettings:
         assert s.interval == 900
         assert s.log_level == "INFO"
 
-    def test_settings_custom_values(self):
+    def test_settings_custom_values(self, tmp_path):
         fc = FeedConfig(name="test", url="https://reddit.com/r/test/.json")
-        s = Settings(output_dir=Path("/tmp/feeds"), interval=300, feeds=[fc])  # noqa: S108
-        assert s.output_dir == Path("/tmp/feeds")  # noqa: S108
+        feeds_dir = tmp_path / "feeds"
+        s = Settings(output_dir=feeds_dir, interval=300, feeds=[fc])
+        assert s.output_dir == feeds_dir
         assert s.interval == 300
         assert len(s.feeds) == 1
 
