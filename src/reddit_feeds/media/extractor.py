@@ -3,11 +3,19 @@
 import asyncio
 import logging
 
+import gallery_dl.extractor as gallery_dl_extractor
+from gallery_dl import config as gallery_dl_config
+
 from reddit_feeds.reddit.models import RedditPost
 
 logger = logging.getLogger(__name__)
 
 _GALLERY_DL_URL_MESSAGE = 3
+_GALLERY_DL_CONFIG: dict[str, bool] = {
+    "download": False,
+    "write-metadata": False,
+    "write-pages": False,
+}
 
 
 def extract_media_urls(post: RedditPost) -> list[str]:
@@ -40,12 +48,8 @@ def _try_gallery_dl(url: str) -> tuple[list[str], bool]:
 
     """
     try:
-        import gallery_dl.extractor as gallery_dl_extractor  # noqa: PLC0415
-        from gallery_dl import config as gallery_dl_config  # noqa: PLC0415
-
-        gallery_dl_config.set((), "download", False)  # noqa: FBT003
-        gallery_dl_config.set((), "write-metadata", False)  # noqa: FBT003
-        gallery_dl_config.set((), "write-pages", False)  # noqa: FBT003
+        for key, value in _GALLERY_DL_CONFIG.items():
+            gallery_dl_config.set((), key, value)
 
         extractor = gallery_dl_extractor.find(url)
         if extractor is None:
@@ -54,11 +58,11 @@ def _try_gallery_dl(url: str) -> tuple[list[str], bool]:
         urls: list[str] = []
         try:
             urls.extend(message[1] for message in extractor if message[0] == _GALLERY_DL_URL_MESSAGE)
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
             return [], False
         else:
             return urls, False
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
         return [], False
