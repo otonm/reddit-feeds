@@ -10,9 +10,9 @@ dependencies = [
     "pyyaml>=6.0.0",
     "python-slugify>=8.0.0",
     "aiofiles>=25.1.0",
-    "pydantic-settings>=2.13.1",
     "feedgen>=1.0.0",
     "typer>=0.24.1",
+    "pydantic>=2.13.3",
 ]
 
 [project.scripts]

@@ -25,7 +25,7 @@ def extract_media_urls(post: RedditPost) -> list[str]:
 
 async def extract_media_urls_async(post: RedditPost) -> list[str]:
     """Async wrapper: runs extract_media_urls in a thread pool to avoid blocking the event loop."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, extract_media_urls, post)
 
 

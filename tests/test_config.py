@@ -50,6 +50,14 @@ class TestSettings:
         assert s.interval == 300
         assert len(s.feeds) == 1
 
+    def test_interval_too_low_raises(self):
+        with pytest.raises(ValidationError):
+            Settings(feeds=[], interval=0)
+
+    def test_interval_at_boundary_60(self):
+        s = Settings(feeds=[], interval=60)
+        assert s.interval == 60
+
 
 class TestLoadSettings:
     def test_load_valid_config(self, sample_config_yaml):

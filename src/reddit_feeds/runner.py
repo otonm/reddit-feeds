@@ -49,6 +49,6 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
     try:
         xml = build_feed(feed, media_posts)
         await write_feed(xml, feed, settings.output_dir)
-        logger.info("[%s] Feed written to %s/%s.xml", feed.name, settings.output_dir, feed.name)
+        logger.info("[%s] Feed written to %s", feed.name, settings.output_dir)
     except Exception:
         logger.exception("[%s] Failed to write feed", feed.name)
