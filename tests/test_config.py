@@ -1,7 +1,12 @@
+"""Tests for config module (models and loader)."""
+
+from pathlib import Path
+
 import pytest
 from pydantic import ValidationError
+
+from reddit_feeds.config.loader import load_settings
 from reddit_feeds.config.models import FeedConfig, Settings
-from pathlib import Path
 
 
 class TestFeedConfig:
@@ -40,7 +45,51 @@ class TestSettings:
 
     def test_settings_custom_values(self):
         fc = FeedConfig(name="test", url="https://reddit.com/r/test/.json")
-        s = Settings(output_dir=Path("/tmp/feeds"), interval=300, feeds=[fc])
-        assert s.output_dir == Path("/tmp/feeds")
+        s = Settings(output_dir=Path("/tmp/feeds"), interval=300, feeds=[fc])  # noqa: S108
+        assert s.output_dir == Path("/tmp/feeds")  # noqa: S108
         assert s.interval == 300
         assert len(s.feeds) == 1
+
+
+class TestLoadSettings:
+    def test_load_valid_config(self, sample_config_yaml):
+        settings = load_settings(sample_config_yaml)
+        assert settings.interval == 600
+        assert len(settings.feeds) == 1
+        assert settings.feeds[0].name == "python"
+        assert settings.feeds[0].fetch_items == 10
+
+    def test_load_config_missing_file(self, tmp_path):
+        with pytest.raises(FileNotFoundError, match="Config file not found"):
+            load_settings(tmp_path / "nonexistent.yaml")
+
+    def test_load_config_defaults_when_keys_absent(self, tmp_path):
+        config = tmp_path / "config.yaml"
+        config.write_text("feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n")
+        settings = load_settings(config)
+        assert settings.output_dir == Path("output")
+        assert settings.interval == 900
+        assert settings.log_level == "INFO"
+
+    def test_env_var_overrides_interval(self, sample_config_yaml, monkeypatch):
+        monkeypatch.setenv("REDDIT_FEEDS_INTERVAL", "300")
+        settings = load_settings(sample_config_yaml)
+        assert settings.interval == 300
+
+    def test_env_var_overrides_output_dir(self, sample_config_yaml, monkeypatch, tmp_path):
+        monkeypatch.setenv("REDDIT_FEEDS_OUTPUT_DIR", str(tmp_path / "feeds"))
+        settings = load_settings(sample_config_yaml)
+        assert settings.output_dir == tmp_path / "feeds"
+
+    def test_env_var_overrides_log_level(self, sample_config_yaml, monkeypatch):
+        monkeypatch.setenv("REDDIT_FEEDS_LOG_LEVEL", "DEBUG")
+        settings = load_settings(sample_config_yaml)
+        assert settings.log_level == "DEBUG"
+
+    def test_invalid_fetch_items_raises_on_load(self, tmp_path):
+        config = tmp_path / "config.yaml"
+        config.write_text(
+            "feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n    fetch_items: 200\n"
+        )
+        with pytest.raises(ValidationError):
+            load_settings(config)
