@@ -24,6 +24,15 @@ package = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--cov=src/reddit_feeds --cov-report=term-missing"
+
+[tool.coverage.run]
+source = ["src/reddit_feeds"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
 
 [tool.ruff]
 line-length = 120
@@ -57,6 +66,7 @@ dev = [
     "feedparser>=6.0.12",
     "pytest>=9.0.2",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=6.0.0",
     "pytest-httpx>=0.36.0",
     "ruff>=0.15.8",
 ]
