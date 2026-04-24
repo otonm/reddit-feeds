@@ -1,44 +1,8 @@
 # reddit-feeds
 
-Fetches Reddit subreddit JSON feeds, extracts direct media links from posts using gallery-dl, and republishes them as RSS 2.0 feeds containing only embedded images, GIFs, and videos. No Reddit credentials, API keys, or authentication required.
+Fetches Reddit subreddit JSON feeds, extracts direct media links from posts, and republishes them as RSS 2.0 feeds containing only embedded images, GIFs, and videos. No Reddit credentials, API keys, or authentication required.
 
 Subscribe to any subreddit as a clean media-only RSS feed in any reader.
-
----
-
-## How it works
-
-```
-Reddit JSON API
-      │
-      ▼
- reddit/client.py      — HTTP GET with httpx, parses post list
-      │
-      ▼
- media/extractor.py    — gallery-dl resolves direct media URLs per post
-      │
-      ▼
- feed/builder.py       — builds RSS 2.0 XML with <enclosure> + embedded HTML
-      │
-      ▼
- feed/writer.py        — writes <slug>.xml to output_dir asynchronously
-```
-
-All configured feeds run concurrently via `asyncio.gather`. Posts with no resolvable media are silently skipped.
-
----
-
-## Components
-
-| Module | Role |
-|--------|------|
-| `src/reddit/client.py` | Fetches posts from Reddit's public `.json` endpoint; no auth needed |
-| `src/media/extractor.py` | Uses gallery-dl (1000+ supported sites: imgur, redgifs, i.redd.it, etc.) to resolve direct media URLs; runs in a thread pool via `run_in_executor` to avoid blocking the event loop |
-| `src/feed/builder.py` | Produces RSS 2.0 XML; each item embeds `<img>` / `<video>` HTML in `<description>` and sets a first-media `<enclosure>` for podcast-style clients |
-| `src/feed/writer.py` | Async file write via aiofiles; filename is a URL-safe slug of the feed name (`EarthPorn` → `earthporn.xml`) |
-| `src/runner.py` | Orchestrates one full cycle across all configured feeds; touches `/tmp/reddit-feeds.last_run` on completion (used by Docker health check) |
-| `src/cli.py` | Typer CLI; supports one-shot and continuous daemon mode |
-| `src/config/` | Pydantic models + YAML loader; validates all settings at startup |
 
 ---
 
@@ -74,8 +38,6 @@ feeds:
     url: https://www.reddit.com/r/AbandonedPorn/.json
 ```
 
-### Fields
-
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `output_dir` | path | `output/` | Directory where RSS `.xml` files are written |
@@ -87,21 +49,21 @@ feeds:
 
 ### Environment variables
 
-All three top-level scalar fields can be overridden at runtime without editing `config.yaml`:
+Top-level scalar fields can be overridden without editing `config.yaml`:
 
-| Variable | Overrides | Example |
-|----------|-----------|---------|
-| `REDDIT_FEEDS_INTERVAL` | `interval` | `REDDIT_FEEDS_INTERVAL=1800` |
-| `REDDIT_FEEDS_LOG_LEVEL` | `log_level` | `REDDIT_FEEDS_LOG_LEVEL=DEBUG` |
-| `REDDIT_FEEDS_OUTPUT_DIR` | `output_dir` | `REDDIT_FEEDS_OUTPUT_DIR=/data/feeds` |
+| Variable | Overrides |
+|----------|-----------|
+| `REDDIT_FEEDS_INTERVAL` | `interval` |
+| `REDDIT_FEEDS_LOG_LEVEL` | `log_level` |
+| `REDDIT_FEEDS_OUTPUT_DIR` | `output_dir` |
 
-Environment variables take precedence over `config.yaml`. Useful for Docker and CI overrides without remounting the config file.
+Environment variables take precedence over `config.yaml`.
 
 ---
 
-## CLI reference
+## CLI
 
-```
+```bash
 uv run python src/cli.py [OPTIONS]
 ```
 
@@ -109,39 +71,20 @@ uv run python src/cli.py [OPTIONS]
 |--------|-------|---------|-------------|
 | `--config PATH` | `-c` | `config.yaml` | Path to configuration file |
 | `--daemon` | `-D` | off | Run continuously, sleeping `interval` seconds between runs |
-| `--debug` | `-d` | off | Force DEBUG log level (mutually exclusive with `--quiet`) |
-| `--quiet` | `-q` | off | Suppress INFO logs; show warnings and errors only |
-
-**Examples:**
-
-```bash
-# One-shot run
-uv run python src/cli.py -c config.yaml
-
-# Daemon mode with debug logging
-uv run python src/cli.py -c config.yaml --daemon --debug
-
-# Quiet daemon (warnings and errors only)
-uv run python src/cli.py -c config.yaml --daemon --quiet
-```
+| `--debug` | `-d` | off | Force DEBUG log level |
+| `--quiet` | `-q` | off | Warnings and errors only |
 
 ---
 
-## Docker deployment
+## Docker
 
-### Pre-built image
-
-GitHub Actions builds and pushes `ghcr.io/otonm/reddit-feeds:latest` on every push to `main`.
+Pull the latest image built by GitHub Actions on every push to `main`:
 
 ```bash
 docker pull ghcr.io/otonm/reddit-feeds:latest
 ```
 
-The image is built from a multi-stage Dockerfile:
-- **Builder stage**: `ghcr.io/astral-sh/uv:python3.12-alpine` installs runtime dependencies
-- **Runtime stage**: `python:3.12-alpine` — only the virtualenv and `src/` are copied; uv is not present
-
-### Running with Docker
+**Run with Docker:**
 
 ```bash
 docker run -d \
@@ -151,19 +94,14 @@ docker run -d \
   ghcr.io/otonm/reddit-feeds:latest
 ```
 
-### Running with Docker Compose
+**Run with Docker Compose:**
 
 ```bash
 docker compose up -d
-```
-
-`docker-compose.yml` mounts `config.yaml` read-only and `output/` for RSS file output. The health check verifies the daemon completed a cycle within the last hour:
-
-```bash
 docker compose ps   # shows health status
 ```
 
-### Building locally
+**Build locally:**
 
 ```bash
 docker build -t reddit-feeds:local .
@@ -173,36 +111,27 @@ docker build -t reddit-feeds:local .
 
 ## Serving feeds with Tailscale Funnel
 
-[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) exposes the output directory over HTTPS to the public internet — no certificates, no reverse proxy, no extra containers required.
+[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) exposes the output directory over HTTPS — no certificates or reverse proxy required.
 
 ### Direct serving
 
 ```bash
-# Start the feeds app
 docker compose up -d
-
-# Serve the output directory publicly via Tailscale Funnel
 tailscale funnel /absolute/path/to/output
 ```
 
-Tailscale handles TLS automatically. Your feeds are available at:
+Feeds available at:
 
 ```
 https://<machine>.ts.net/earthporn.xml
 https://<machine>.ts.net/abandonedporn.xml
 ```
 
-Subscribe to these URLs in any RSS reader (NetNewsWire, Reeder, Miniflux, Feedly, etc.).
-
-To stop:
-
-```bash
-tailscale funnel off
-```
+To stop: `tailscale funnel off`
 
 ### Fully containerised: Tailscale sidecar
 
-For deployments where Tailscale must also run inside Docker (e.g. a remote server with no Tailscale installed), use a `tailscale/tailscale` sidecar. It shares the output volume with the feeds container and serves it as a Funnel.
+For servers where Tailscale runs in Docker alongside the app.
 
 **1. Create `ts-serve.json`:**
 
@@ -228,17 +157,15 @@ For deployments where Tailscale must also run inside Docker (e.g. a remote serve
 }
 ```
 
-`${TS_CERT_DOMAIN}` is resolved automatically by the Tailscale container at runtime.
-
 **2. Create `.env`:**
 
 ```
 TS_AUTHKEY=tskey-auth-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Generate an auth key at [Tailscale admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys). Use a reusable, pre-authenticated key for server deployments.
+Get an auth key from [Tailscale admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys). Use a reusable, pre-authenticated key.
 
-**3. Use this `docker-compose.yml`:**
+**3. `docker-compose.yml`:**
 
 ```yaml
 services:
@@ -285,16 +212,3 @@ docker compose up -d
 ```
 
 Feeds available at `https://reddit-feeds.<tailnet>.ts.net/earthporn.xml`.
-
----
-
-## Development
-
-```bash
-uv sync                  # install all deps including dev tools
-uv run pytest            # run test suite (100% coverage enforced)
-uv run ruff check        # lint
-uv run ruff format .     # format
-```
-
-Tests use pytest-asyncio and pytest-httpx; no external services are required.
