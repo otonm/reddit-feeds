@@ -1,7 +1,6 @@
 import httpx
 import pytest
 from pytest_httpx import HTTPXMock
-
 from reddit_feeds.reddit.client import _parse_post, fetch_posts
 
 

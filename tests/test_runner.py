@@ -3,7 +3,6 @@ from unittest.mock import AsyncMock, patch
 
 import feedparser
 import httpx
-
 from reddit_feeds.config.models import FeedConfig, Settings
 from reddit_feeds.reddit.models import RedditPost
 from reddit_feeds.runner import process_feed, run_once

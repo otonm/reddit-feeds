@@ -5,10 +5,9 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from typer.testing import CliRunner
-
 from reddit_feeds.cli import _run_daemon, app, main
 from reddit_feeds.config.models import FeedConfig, Settings
+from typer.testing import CliRunner
 
 runner = CliRunner()
 
