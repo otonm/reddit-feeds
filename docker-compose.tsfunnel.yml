@@ -1,6 +1,7 @@
 services:
   reddit-feeds:
     image: ghcr.io/otonm/reddit-feeds:latest
+    container_name: reddit-feeds
     volumes:
       - feeds-output:/app/output
     configs:
@@ -8,8 +9,8 @@ services:
         target: /app/config.yaml
     restart: unless-stopped
     environment:
-      - REDDIT_FEEDS_INTERVAL        # optional: overrides interval (seconds, min 300)
-      - REDDIT_FEEDS_LOG_LEVEL       # optional: overrides log_level
+      - REDDIT_FEEDS_INTERVAL=600
+      - REDDIT_FEEDS_LOG_LEVEL=INFO
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
       interval: 2m
@@ -19,14 +20,12 @@ services:
 
   tailscale:
     image: tailscale/tailscale
+    container_name: tailscale
     hostname: reddit-feeds
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
-      - TS_STATE_DIR=/var/lib/tailscale
       - TS_SERVE_CONFIG=/config/ts-serve.json
-      - TS_USERSPACE=false
       - TS_ENABLE_HEALTH_CHECK=true
-      - TS_LOCAL_ADDR_PORT=127.0.0.1:41234
     volumes:
       - tailscale-state:/var/lib/tailscale
       - feeds-output:/feeds:ro
@@ -51,6 +50,7 @@ configs:
       feeds:
         - name: EarthPorn
           url: https://www.reddit.com/r/EarthPorn/.json
+          fetch_items: 25
         - name: AbandonedPorn
           url: https://www.reddit.com/r/AbandonedPorn/.json
           fetch_items: 25

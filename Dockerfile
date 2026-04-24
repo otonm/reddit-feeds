@@ -17,7 +17,9 @@ FROM python:3.12-alpine AS runtime
 
 WORKDIR /app
 
-RUN adduser -D -u 1000 appuser
+RUN adduser -D -u 1000 appuser && \
+    mkdir -p /app/output && \
+    chown appuser:appuser /app/output
 
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src

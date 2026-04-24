@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+import threading
+from pathlib import PurePosixPath
 
 import gallery_dl.extractor as gallery_dl_extractor
 from gallery_dl import config as gallery_dl_config
@@ -16,6 +18,17 @@ _GALLERY_DL_CONFIG: dict[str, bool] = {
     "write-metadata": False,
     "write-pages": False,
 }
+# gallery-dl's extractor registry initialization is not thread-safe; serialize all find() calls.
+_gallery_dl_lock = threading.Lock()
+
+_DIRECT_MEDIA_EXTENSIONS = frozenset({
+    ".jpg", ".jpeg", ".png", ".gif", ".gifv", ".webp",
+    ".mp4", ".webm", ".mov",
+})
+
+
+def _is_direct_media_url(url: str) -> bool:
+    return PurePosixPath(url.split("?", maxsplit=1)[0]).suffix.lower() in _DIRECT_MEDIA_EXTENSIONS
 
 
 def extract_media_urls(post: RedditPost) -> list[str]:
@@ -24,6 +37,11 @@ def extract_media_urls(post: RedditPost) -> list[str]:
     Returns empty list if no media can be extracted. Safe to call from a thread pool.
     """
     logger.debug("Extracting media from %s (hint=%s)", post.url, post.post_hint)
+
+    if _is_direct_media_url(post.url):
+        logger.debug("Direct media URL, skipping gallery-dl: %s", post.url)
+        return [post.url]
+
     urls, can_fallback = _try_gallery_dl(post.url)
 
     if not urls and can_fallback and post.post_hint == "image":
@@ -50,24 +68,27 @@ def _try_gallery_dl(url: str) -> tuple[list[str], bool]:
         False when extraction was attempted but failed or returned nothing.
 
     """
-    try:
-        for key, value in _GALLERY_DL_CONFIG.items():
-            gallery_dl_config.set((), key, value)
-
-        extractor = gallery_dl_extractor.find(url)
-        if extractor is None:
-            logger.debug("No gallery-dl extractor found for %s", url)
-            return [], True
-
-        urls: list[str] = []
+    with _gallery_dl_lock:
         try:
-            urls.extend(message[1] for message in extractor if message[0] == _GALLERY_DL_URL_MESSAGE)
-        except Exception:
-            logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
+            for key, value in _GALLERY_DL_CONFIG.items():
+                gallery_dl_config.set((), key, value)
+
+            extractor = gallery_dl_extractor.find(url)
+            if extractor is None:
+                logger.debug("No gallery-dl extractor found for %s", url)
+                return [], True
+
+            urls: list[str] = []
+            try:
+                urls.extend(message[1] for message in extractor if message[0] == _GALLERY_DL_URL_MESSAGE)
+            except Exception as e:
+                logger.warning("gallery-dl extraction failed for %s: %s: %s", url, type(e).__name__, e)
+                logger.debug("gallery-dl extraction failed for %s", url, exc_info=True)
+                return [], False
+            else:
+                logger.debug("gallery-dl found %d URL(s) for %s", len(urls), url)
+                return urls, False
+        except Exception as e:
+            logger.warning("gallery-dl extraction failed for %s: %s: %s", url, type(e).__name__, e)
+            logger.debug("gallery-dl extraction failed for %s", url, exc_info=True)
             return [], False
-        else:
-            logger.debug("gallery-dl found %d URL(s) for %s", len(urls), url)
-            return urls, False
-    except Exception:
-        logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
-        return [], False
