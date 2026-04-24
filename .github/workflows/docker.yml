@@ -3,6 +3,11 @@ name: Docker
 on:
   push:
     branches: [main]
+    paths:
+      - "src/**"
+      - "Dockerfile"
+      - "pyproject.toml"
+      - ".github/workflows/docker.yml"
 
 jobs:
   test:

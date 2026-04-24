@@ -1,6 +1,12 @@
 # Git worktrees
 .worktrees/
 
+# Local dev / AI tooling
+uv.lock
+.mcp.json
+.claude/
+CLAUDE.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

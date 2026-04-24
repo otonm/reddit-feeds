@@ -5,9 +5,9 @@ FROM ghcr.io/astral-sh/uv:python3.12-alpine AS builder
 
 WORKDIR /app
 
-# Install deps first — cached layer, only re-runs when lockfile changes
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
+# Install deps first — cached layer, only re-runs when pyproject.toml changes
+COPY pyproject.toml ./
+RUN uv sync --no-dev --no-install-project
 
 # Copy source after deps to avoid busting the dep cache on source changes
 COPY src/ ./src/
