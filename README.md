@@ -173,61 +173,31 @@ docker build -t reddit-feeds:local .
 
 ## Serving feeds with Tailscale Funnel
 
-[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) exposes a local port over HTTPS to the public internet or your tailnet — no reverse proxy config, no certificates to manage.
+[Tailscale Funnel](https://tailscale.com/kb/1223/funnel) exposes the output directory over HTTPS to the public internet — no certificates, no reverse proxy, no extra containers required.
 
-The simplest setup adds an nginx container that serves the `output/` directory, then funnels it.
-
-### docker-compose.yml
-
-```yaml
-services:
-  reddit-feeds:
-    image: ghcr.io/otonm/reddit-feeds:latest
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - ./output:/app/output
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
-      interval: 2m
-      timeout: 10s
-      start_period: 2m
-      retries: 3
-
-  server:
-    image: nginx:alpine
-    ports:
-      - "127.0.0.1:8080:80"
-    volumes:
-      - ./output:/usr/share/nginx/html:ro
-    restart: unless-stopped
-    depends_on:
-      - reddit-feeds
-```
-
-### Start and expose
+### Direct serving
 
 ```bash
-# Start both containers
+# Start the feeds app
 docker compose up -d
 
-# Expose port 8080 via Tailscale Funnel (runs in background)
-tailscale funnel --bg 8080
+# Serve the output directory publicly via Tailscale Funnel
+tailscale funnel /absolute/path/to/output
 ```
 
-Tailscale provides HTTPS automatically. Your feeds are available at:
+Tailscale handles TLS automatically. Your feeds are available at:
 
 ```
-https://<machine>.<tailnet>.ts.net/earthporn.xml
-https://<machine>.<tailnet>.ts.net/abandonedporn.xml
+https://<machine>.ts.net/earthporn.xml
+https://<machine>.ts.net/abandonedporn.xml
 ```
 
 Subscribe to these URLs in any RSS reader (NetNewsWire, Reeder, Miniflux, Feedly, etc.).
 
-### Stop the funnel
+To stop:
 
 ```bash
-tailscale funnel --bg off
+tailscale funnel off
 ```
 
 ---
