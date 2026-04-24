@@ -6,8 +6,8 @@ from urllib.parse import urlparse
 
 from feedgen.feed import FeedGenerator
 
-from reddit_feeds.config.models import FeedConfig
-from reddit_feeds.feed.models import MediaPost
+from config.models import FeedConfig
+from feed.models import MediaPost
 
 logger = logging.getLogger(__name__)
 

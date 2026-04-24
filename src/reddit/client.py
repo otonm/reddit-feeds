@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from reddit_feeds.reddit.models import RedditPost
+from reddit.models import RedditPost
 
 USER_AGENT = "reddit-feeds/0.1"
 TIMEOUT = 15.0

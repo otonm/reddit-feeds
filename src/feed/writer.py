@@ -7,7 +7,7 @@ import aiofiles
 import aiofiles.os
 from slugify import slugify
 
-from reddit_feeds.config.models import FeedConfig
+from config.models import FeedConfig
 
 logger = logging.getLogger(__name__)
 

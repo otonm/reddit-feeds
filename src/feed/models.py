@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from reddit_feeds.reddit.models import RedditPost
+from reddit.models import RedditPost
 
 
 @dataclass

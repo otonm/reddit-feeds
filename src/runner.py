@@ -5,12 +5,12 @@ import logging
 
 import httpx
 
-from reddit_feeds.config.models import FeedConfig, Settings
-from reddit_feeds.feed.builder import build_feed
-from reddit_feeds.feed.models import MediaPost
-from reddit_feeds.feed.writer import write_feed
-from reddit_feeds.media.extractor import extract_media_urls_async
-from reddit_feeds.reddit.client import fetch_posts
+from config.models import FeedConfig, Settings
+from feed.builder import build_feed
+from feed.models import MediaPost
+from feed.writer import write_feed
+from media.extractor import extract_media_urls_async
+from reddit.client import fetch_posts
 
 logger = logging.getLogger(__name__)
 

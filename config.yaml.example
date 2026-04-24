@@ -1,0 +1,19 @@
+# Reddit Feeds Configuration
+# Copy this file to config.yaml and customize
+
+output_dir: output/  # Output directory for RSS files (default: output/)
+
+feeds:
+  # Example feed with all options specified
+  - name: EarthPorn
+    url: https://www.reddit.com/r/EarthPorn/.json
+    fetch_items: 25      # Number of posts to fetch (default: 20, max: 100)
+
+  # Example feed using defaults
+  - name: AbandonedPorn
+    url: https://www.reddit.com/r/AbandonedPorn/.json
+    # fetch_items will use default (20)
+
+  # Add more feeds as needed
+  # - name: HistoryPorn
+  #   url: https://www.reddit.com/r/HistoryPorn/.json

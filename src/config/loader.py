@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from reddit_feeds.config.models import Settings
+from config.models import Settings
 
 
 def load_settings(config_path: Path) -> Settings:

@@ -6,7 +6,7 @@ import logging
 import gallery_dl.extractor as gallery_dl_extractor
 from gallery_dl import config as gallery_dl_config
 
-from reddit_feeds.reddit.models import RedditPost
+from reddit.models import RedditPost
 
 logger = logging.getLogger(__name__)
 

@@ -8,9 +8,9 @@ from typing import Annotated
 
 import typer
 
-from reddit_feeds.config.loader import load_settings
-from reddit_feeds.config.models import Settings
-from reddit_feeds.runner import run_once
+from config.loader import load_settings
+from config.models import Settings
+from runner import run_once
 
 app = typer.Typer(help="Fetch Reddit feeds and publish them as RSS files.")
 
@@ -58,3 +58,7 @@ async def _run_daemon(settings: Settings) -> None:
 def main() -> None:
     """Entry point for the `reddit-feeds` CLI command."""
     app()
+
+
+if __name__ == "__main__":
+    main()
