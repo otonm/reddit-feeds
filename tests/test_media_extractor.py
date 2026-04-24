@@ -29,14 +29,36 @@ def make_mock_extractor(url_messages: list[str]) -> MagicMock:
 
 
 class TestExtractMediaUrls:
+    def test_direct_media_url_skips_gallery_dl(self):
+        """URLs with known media extensions bypass gallery-dl and are returned as-is."""
+        for url in [
+            "https://i.redd.it/abc123.jpg",
+            "https://live.staticflickr.com/65535/photo_4k.jpg",
+            "https://example.com/clip.mp4",
+            "https://example.com/anim.gif",
+        ]:
+            post = make_post(url=url, post_hint="image")
+            with patch("gallery_dl.extractor.find") as mock_find:
+                urls = extract_media_urls(post)
+            assert urls == [url]
+            mock_find.assert_not_called()
+
+    def test_direct_url_with_query_string_recognised(self):
+        url = "https://example.com/photo.png?size=large"
+        post = make_post(url=url, post_hint="image")
+        with patch("gallery_dl.extractor.find") as mock_find:
+            urls = extract_media_urls(post)
+        assert urls == [url]
+        mock_find.assert_not_called()
+
     def test_single_image_via_gallery_dl(self):
-        post = make_post(url="https://i.redd.it/abc123.jpg", post_hint="image")
-        mock_extractor = make_mock_extractor(["https://i.redd.it/abc123.jpg"])
+        post = make_post(url="https://imgur.com/abc123", post_hint="image")
+        mock_extractor = make_mock_extractor(["https://i.imgur.com/abc123.jpg"])
 
         with patch("gallery_dl.extractor.find", return_value=mock_extractor):
             urls = extract_media_urls(post)
 
-        assert urls == ["https://i.redd.it/abc123.jpg"]
+        assert urls == ["https://i.imgur.com/abc123.jpg"]
 
     def test_gallery_multiple_images(self):
         post = make_post(
@@ -57,12 +79,13 @@ class TestExtractMediaUrls:
         assert urls == ["https://i.redd.it/img1.jpg", "https://i.redd.it/img2.jpg"]
 
     def test_fallback_to_direct_url_when_gallery_dl_returns_none(self):
-        post = make_post(url="https://i.redd.it/direct.jpg", post_hint="image")
+        """When gallery-dl has no extractor for a URL and post_hint is 'image', use post.url directly."""
+        post = make_post(url="https://imgur.com/xyz", post_hint="image")
 
         with patch("gallery_dl.extractor.find", return_value=None):
             urls = extract_media_urls(post)
 
-        assert urls == ["https://i.redd.it/direct.jpg"]
+        assert urls == ["https://imgur.com/xyz"]
 
     def test_no_fallback_for_non_image_post_hint(self):
         post = make_post(url="https://example.com/article", post_hint="link")
@@ -89,7 +112,7 @@ class TestExtractMediaUrls:
         assert urls == []
 
     def test_gallery_dl_iteration_exception_returns_empty_list(self):
-        post = make_post(url="https://example.com/img.jpg", post_hint="image")
+        post = make_post(url="https://example.com/album", post_hint="image")
         mock_extractor = MagicMock()
         mock_extractor.__iter__ = MagicMock(side_effect=RuntimeError("extraction failed"))
 
@@ -100,13 +123,13 @@ class TestExtractMediaUrls:
 
     def test_non_url_messages_are_ignored(self):
         """Message type 1 (Directory) and 2 (Queue) should not be added to urls."""
-        post = make_post(url="https://i.redd.it/abc.jpg", post_hint="image")
+        post = make_post(url="https://imgur.com/abc", post_hint="image")
         mock_extractor = MagicMock()
         mock_extractor.__iter__ = MagicMock(
             return_value=iter(
                 [
                     (1, {"category": "reddit"}, {}),
-                    (3, "https://i.redd.it/abc.jpg", {}),
+                    (3, "https://i.imgur.com/abc.jpg", {}),
                 ]
             )
         )
@@ -114,15 +137,13 @@ class TestExtractMediaUrls:
         with patch("gallery_dl.extractor.find", return_value=mock_extractor):
             urls = extract_media_urls(post)
 
-        assert urls == ["https://i.redd.it/abc.jpg"]
+        assert urls == ["https://i.imgur.com/abc.jpg"]
 
 
 class TestExtractMediaUrlsAsync:
     async def test_async_wrapper_delegates_to_sync(self):
         post = make_post(url="https://i.redd.it/abc123.jpg", post_hint="image")
-        mock_extractor = make_mock_extractor(["https://i.redd.it/abc123.jpg"])
 
-        with patch("gallery_dl.extractor.find", return_value=mock_extractor):
-            urls = await extract_media_urls_async(post)
+        urls = await extract_media_urls_async(post)
 
         assert urls == ["https://i.redd.it/abc123.jpg"]
