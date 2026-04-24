@@ -117,7 +117,7 @@ docker build -t reddit-feeds:local .
 
 ```bash
 docker compose up -d
-tailscale funnel /absolute/path/to/output
+tailscale funnel --bg /path/to/output
 ```
 
 Feeds available at:
@@ -131,41 +131,17 @@ To stop: `tailscale funnel off`
 
 ### Fully containerised: Tailscale sidecar
 
-For servers where Tailscale runs in Docker alongside the app.
+For deployments where Tailscale must also run inside Docker. The serve config is embedded directly in `docker-compose.yml` via Docker Compose's `configs` feature — no separate JSON file needed.
 
-**1. Create `ts-serve.json`:**
-
-```json
-{
-  "TCP": {
-    "443": {
-      "HTTPS": true
-    }
-  },
-  "Web": {
-    "${TS_CERT_DOMAIN}:443": {
-      "Handlers": {
-        "/": {
-          "Path": "/feeds/"
-        }
-      }
-    }
-  },
-  "AllowFunnel": {
-    "${TS_CERT_DOMAIN}:443": true
-  }
-}
-```
-
-**2. Create `.env`:**
+**1. Create `.env`:**
 
 ```
 TS_AUTHKEY=tskey-auth-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-Get an auth key from [Tailscale admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys). Use a reusable, pre-authenticated key.
+Generate an auth key at [Tailscale admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys). Use a reusable, pre-authenticated key for server deployments.
 
-**3. `docker-compose.yml`:**
+**2. `docker-compose.yml`:**
 
 ```yaml
 services:
@@ -192,20 +168,48 @@ services:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_STATE_DIR=/var/lib/tailscale
       - TS_SERVE_CONFIG=/config/ts-serve.json
+      - TS_USERSPACE=false
+      - TS_ENABLE_HEALTH_CHECK=true
+      - TS_LOCAL_ADDR_PORT=127.0.0.1:41234
     volumes:
       - tailscale-state:/var/lib/tailscale
-      - ./ts-serve.json:/config/ts-serve.json:ro
       - feeds-output:/feeds:ro
+    configs:
+      - source: ts-serve-config
+        target: /config/ts-serve.json
+    devices:
+      - /dev/net/tun:/dev/net/tun
     cap_add:
       - NET_ADMIN
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:41234/healthz || exit 1"]
+      interval: 1m
+      timeout: 10s
+      start_period: 1m
+      retries: 3
+
+configs:
+  ts-serve-config:
+    content: |
+      {
+        "TCP": { "443": { "HTTPS": true } },
+        "Web": {
+          "$${TS_CERT_DOMAIN}:443": {
+            "Handlers": { "/": { "Path": "/feeds/" } }
+          }
+        },
+        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": true }
+      }
 
 volumes:
   tailscale-state:
   feeds-output:
 ```
 
-**4. Start:**
+`$${TS_CERT_DOMAIN}` is a Docker Compose escape that writes `${TS_CERT_DOMAIN}` literally into the config file; Tailscale resolves it to your machine's cert domain at runtime.
+
+**3. Start:**
 
 ```bash
 docker compose up -d
