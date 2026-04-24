@@ -5,6 +5,9 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - ./output:/app/output
     restart: unless-stopped
+    environment:
+      - REDDIT_FEEDS_INTERVAL=900       # optional: overrides config.yaml interval
+      - REDDIT_FEEDS_LOG_LEVEL=INFO     # optional: overrides config.yaml log_level
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
       interval: 2m
