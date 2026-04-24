@@ -55,9 +55,13 @@ class TestSettings:
         with pytest.raises(ValidationError):
             Settings(feeds=[], interval=0)
 
-    def test_interval_at_boundary_60(self):
-        s = Settings(feeds=[], interval=60)
-        assert s.interval == 60
+    def test_interval_at_boundary_300(self):
+        s = Settings(feeds=[], interval=300)
+        assert s.interval == 300
+
+    def test_interval_at_299_raises(self):
+        with pytest.raises(ValidationError):
+            Settings(feeds=[], interval=299)
 
 
 class TestLoadSettings:

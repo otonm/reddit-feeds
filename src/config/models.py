@@ -5,7 +5,7 @@ from pathlib import Path
 from pydantic import BaseModel, field_validator
 
 _MAX_FETCH_ITEMS = 100
-_MIN_INTERVAL = 60
+_MIN_INTERVAL = 300
 
 
 class FeedConfig(BaseModel):
@@ -36,8 +36,8 @@ class Settings(BaseModel):
     @field_validator("interval")
     @classmethod
     def validate_interval(cls, v: int) -> int:
-        """Ensure interval is at least 60 seconds."""
+        """Ensure interval is at least 300 seconds."""
         if v < _MIN_INTERVAL:
-            msg = f"interval must be at least 60 seconds, got {v}"
+            msg = f"interval must be at least 300 seconds, got {v}"
             raise ValueError(msg)
         return v
