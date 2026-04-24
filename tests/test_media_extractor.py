@@ -2,7 +2,7 @@
 
 from unittest.mock import MagicMock, patch
 
-from reddit_feeds.media.extractor import extract_media_urls
+from reddit_feeds.media.extractor import extract_media_urls, extract_media_urls_async
 from reddit_feeds.reddit.models import RedditPost
 
 
@@ -115,3 +115,14 @@ class TestExtractMediaUrls:
             urls = extract_media_urls(post)
 
         assert urls == ["https://i.redd.it/abc.jpg"]
+
+
+class TestExtractMediaUrlsAsync:
+    async def test_async_wrapper_delegates_to_sync(self):
+        post = make_post(url="https://i.redd.it/abc123.jpg", post_hint="image")
+        mock_extractor = make_mock_extractor(["https://i.redd.it/abc123.jpg"])
+
+        with patch("gallery_dl.extractor.find", return_value=mock_extractor):
+            urls = await extract_media_urls_async(post)
+
+        assert urls == ["https://i.redd.it/abc123.jpg"]

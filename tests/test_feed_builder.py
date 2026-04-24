@@ -93,6 +93,13 @@ class TestBuildFeed:
         assert parsed.feed.title == "r/python"
         assert len(parsed.entries) == 0
 
+    def test_post_with_empty_media_urls_has_no_enclosure(self):
+        posts = [make_media_post([])]
+        xml = build_feed(make_feed_config(), posts)
+        parsed = feedparser.parse(xml)
+        assert len(parsed.entries) == 1
+        assert parsed.entries[0].get("enclosures", []) == []
+
 
 class TestInferMime:
     def test_jpeg_extensions(self):

@@ -94,6 +94,19 @@ class TestProcessFeed:
         xml_arg = mock_write.call_args[0][0]
         assert len(feedparser.parse(xml_arg).entries) == 0
 
+    async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
+        settings = make_settings(tmp_path, [config])
+        post = make_reddit_post()
+
+        with (
+            patch("reddit_feeds.runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("reddit_feeds.runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])),
+            patch("reddit_feeds.runner.write_feed", AsyncMock(side_effect=OSError("disk full"))),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client)  # must not raise
+
 
 class TestRunOnce:
     async def test_run_once_processes_all_feeds(self, tmp_path):
