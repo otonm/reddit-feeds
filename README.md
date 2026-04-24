@@ -96,6 +96,8 @@ docker run -d \
 
 **Run with Docker Compose:**
 
+Edit the `configs.feeds-config.content` block in `docker-compose.yml` to add your feeds, then:
+
 ```bash
 docker compose up -d
 docker compose ps   # shows health status
@@ -131,7 +133,7 @@ To stop: `tailscale funnel off`
 
 ### Fully containerised: Tailscale sidecar
 
-For deployments where Tailscale must also run inside Docker. The serve config is embedded directly in `docker-compose.yml` via Docker Compose's `configs` feature — no separate JSON file needed.
+Use `docker-compose.tsfunnel.yml` (included in the repo). It runs the feeds app and a Tailscale sidecar together — feeds and Tailscale serve config are both embedded inline; no external config files needed.
 
 **1. Create `.env`:**
 
@@ -141,78 +143,28 @@ TS_AUTHKEY=tskey-auth-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 Generate an auth key at [Tailscale admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys). Use a reusable, pre-authenticated key for server deployments.
 
-**2. `docker-compose.yml`:**
+**2. Edit feeds in `docker-compose.tsfunnel.yml`:**
+
+Find the `configs.feeds-config.content` block and replace the example feeds with your own:
 
 ```yaml
-services:
-  reddit-feeds:
-    image: ghcr.io/otonm/reddit-feeds:latest
-    volumes:
-      - ./config.yaml:/app/config.yaml:ro
-      - feeds-output:/app/output
-    restart: unless-stopped
-    environment:
-      - REDDIT_FEEDS_INTERVAL
-      - REDDIT_FEEDS_LOG_LEVEL
-    healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
-      interval: 2m
-      timeout: 10s
-      start_period: 2m
-      retries: 3
-
-  tailscale:
-    image: tailscale/tailscale
-    hostname: reddit-feeds
-    environment:
-      - TS_AUTHKEY=${TS_AUTHKEY}
-      - TS_STATE_DIR=/var/lib/tailscale
-      - TS_SERVE_CONFIG=/config/ts-serve.json
-      - TS_USERSPACE=false
-      - TS_ENABLE_HEALTH_CHECK=true
-      - TS_LOCAL_ADDR_PORT=127.0.0.1:41234
-    volumes:
-      - tailscale-state:/var/lib/tailscale
-      - feeds-output:/feeds:ro
-    configs:
-      - source: ts-serve-config
-        target: /config/ts-serve.json
-    devices:
-      - /dev/net/tun:/dev/net/tun
-    cap_add:
-      - NET_ADMIN
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:41234/healthz || exit 1"]
-      interval: 1m
-      timeout: 10s
-      start_period: 1m
-      retries: 3
-
 configs:
-  ts-serve-config:
+  feeds-config:
     content: |
-      {
-        "TCP": { "443": { "HTTPS": true } },
-        "Web": {
-          "$${TS_CERT_DOMAIN}:443": {
-            "Handlers": { "/": { "Path": "/feeds/" } }
-          }
-        },
-        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": true }
-      }
-
-volumes:
-  tailscale-state:
-  feeds-output:
+      feeds:
+        - name: EarthPorn
+          url: https://www.reddit.com/r/EarthPorn/.json
+        - name: AbandonedPorn
+          url: https://www.reddit.com/r/AbandonedPorn/.json
+          fetch_items: 25
 ```
-
-`$${TS_CERT_DOMAIN}` is a Docker Compose escape that writes `${TS_CERT_DOMAIN}` literally into the config file; Tailscale resolves it to your machine's cert domain at runtime.
 
 **3. Start:**
 
 ```bash
-docker compose up -d
+docker compose -f docker-compose.tsfunnel.yml up -d
 ```
 
 Feeds available at `https://reddit-feeds.<tailnet>.ts.net/earthporn.xml`.
+
+`$${TS_CERT_DOMAIN}` in the Tailscale serve config is a Docker Compose escape that writes `${TS_CERT_DOMAIN}` literally into the mounted file; Tailscale resolves it to your machine's cert domain at runtime.

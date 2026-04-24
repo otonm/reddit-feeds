@@ -1,0 +1,72 @@
+services:
+  reddit-feeds:
+    image: ghcr.io/otonm/reddit-feeds:latest
+    volumes:
+      - feeds-output:/app/output
+    configs:
+      - source: feeds-config
+        target: /app/config.yaml
+    restart: unless-stopped
+    environment:
+      - REDDIT_FEEDS_INTERVAL        # optional: overrides interval (seconds, min 300)
+      - REDDIT_FEEDS_LOG_LEVEL       # optional: overrides log_level
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
+      interval: 2m
+      timeout: 10s
+      start_period: 2m
+      retries: 3
+
+  tailscale:
+    image: tailscale/tailscale
+    hostname: reddit-feeds
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/ts-serve.json
+      - TS_USERSPACE=false
+      - TS_ENABLE_HEALTH_CHECK=true
+      - TS_LOCAL_ADDR_PORT=127.0.0.1:41234
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - feeds-output:/feeds:ro
+    configs:
+      - source: ts-serve-config
+        target: /config/ts-serve.json
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:41234/healthz || exit 1"]
+      interval: 1m
+      timeout: 10s
+      start_period: 1m
+      retries: 3
+
+configs:
+  feeds-config:
+    content: |
+      feeds:
+        - name: EarthPorn
+          url: https://www.reddit.com/r/EarthPorn/.json
+        - name: AbandonedPorn
+          url: https://www.reddit.com/r/AbandonedPorn/.json
+          fetch_items: 25
+
+  ts-serve-config:
+    content: |
+      {
+        "TCP": { "443": { "HTTPS": true } },
+        "Web": {
+          "$${TS_CERT_DOMAIN}:443": {
+            "Handlers": { "/": { "Path": "/feeds/" } }
+          }
+        },
+        "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": true }
+      }
+
+volumes:
+  tailscale-state:
+  feeds-output:

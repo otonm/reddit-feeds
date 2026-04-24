@@ -2,16 +2,28 @@ services:
   reddit-feeds:
     image: ghcr.io/otonm/reddit-feeds:latest
     volumes:
-      - ./config.yaml:/app/config.yaml:ro
       - ./output:/app/output
+    configs:
+      - source: feeds-config
+        target: /app/config.yaml
     restart: unless-stopped
     environment:
-      - REDDIT_FEEDS_INTERVAL        # optional: overrides config.yaml interval
-      - REDDIT_FEEDS_LOG_LEVEL       # optional: overrides config.yaml log_level
-      - REDDIT_FEEDS_OUTPUT_DIR      # optional: overrides config.yaml output_dir
+      - REDDIT_FEEDS_INTERVAL        # optional: overrides interval (seconds, min 300)
+      - REDDIT_FEEDS_LOG_LEVEL       # optional: overrides log_level
+      - REDDIT_FEEDS_OUTPUT_DIR      # optional: overrides output_dir
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
       interval: 2m
       timeout: 10s
       start_period: 2m
       retries: 3
+
+configs:
+  feeds-config:
+    content: |
+      feeds:
+        - name: EarthPorn
+          url: https://www.reddit.com/r/EarthPorn/.json
+        - name: AbandonedPorn
+          url: https://www.reddit.com/r/AbandonedPorn/.json
+          fetch_items: 25
