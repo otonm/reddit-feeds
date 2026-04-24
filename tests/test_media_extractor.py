@@ -2,8 +2,8 @@
 
 from unittest.mock import MagicMock, patch
 
-from reddit_feeds.media.extractor import extract_media_urls, extract_media_urls_async
-from reddit_feeds.reddit.models import RedditPost
+from media.extractor import extract_media_urls, extract_media_urls_async
+from reddit.models import RedditPost
 
 
 def make_post(**kwargs) -> RedditPost:

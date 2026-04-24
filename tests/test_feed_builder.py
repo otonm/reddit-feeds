@@ -1,9 +1,10 @@
 import feedparser
-from reddit_feeds.config.models import FeedConfig
-from reddit_feeds.feed.builder import _infer_mime, build_feed
-from reddit_feeds.feed.models import MediaPost
-from reddit_feeds.feed.writer import write_feed
-from reddit_feeds.reddit.models import RedditPost
+
+from config.models import FeedConfig
+from feed.builder import _infer_mime, build_feed
+from feed.models import MediaPost
+from feed.writer import write_feed
+from reddit.models import RedditPost
 
 
 def make_feed_config(name: str = "python") -> FeedConfig:

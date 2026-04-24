@@ -3,9 +3,10 @@ from unittest.mock import AsyncMock, patch
 
 import feedparser
 import httpx
-from reddit_feeds.config.models import FeedConfig, Settings
-from reddit_feeds.reddit.models import RedditPost
-from reddit_feeds.runner import process_feed, run_once
+
+from config.models import FeedConfig, Settings
+from reddit.models import RedditPost
+from runner import process_feed, run_once
 
 
 def make_settings(tmp_path: Path, feeds: list[FeedConfig] | None = None) -> Settings:
@@ -38,9 +39,9 @@ class TestProcessFeed:
         post = make_reddit_post()
 
         with (
-            patch("reddit_feeds.runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
             patch(
-                "reddit_feeds.runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
+                "runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
             ),
         ):
             async with httpx.AsyncClient() as client:
@@ -60,9 +61,9 @@ class TestProcessFeed:
             written_posts.extend(parsed.entries)
 
         with (
-            patch("reddit_feeds.runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("reddit_feeds.runner.extract_media_urls_async", AsyncMock(return_value=[])),
-            patch("reddit_feeds.runner.write_feed", side_effect=mock_write),
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=[])),
+            patch("runner.write_feed", side_effect=mock_write),
         ):
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client)
@@ -73,7 +74,7 @@ class TestProcessFeed:
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
         settings = make_settings(tmp_path, [config])
 
-        with patch("reddit_feeds.runner.fetch_posts", AsyncMock(side_effect=Exception("network error"))):
+        with patch("runner.fetch_posts", AsyncMock(side_effect=Exception("network error"))):
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client)  # must not raise
 
@@ -83,9 +84,9 @@ class TestProcessFeed:
         post = make_reddit_post()
 
         with (
-            patch("reddit_feeds.runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("reddit_feeds.runner.extract_media_urls_async", AsyncMock(side_effect=Exception("gallery-dl broke"))),
-            patch("reddit_feeds.runner.write_feed", AsyncMock()) as mock_write,
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", AsyncMock(side_effect=Exception("gallery-dl broke"))),
+            patch("runner.write_feed", AsyncMock()) as mock_write,
         ):
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client)
@@ -99,9 +100,9 @@ class TestProcessFeed:
         post = make_reddit_post()
 
         with (
-            patch("reddit_feeds.runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("reddit_feeds.runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])),
-            patch("reddit_feeds.runner.write_feed", AsyncMock(side_effect=OSError("disk full"))),
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])),
+            patch("runner.write_feed", AsyncMock(side_effect=OSError("disk full"))),
         ):
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client)  # must not raise
@@ -118,7 +119,7 @@ class TestRunOnce:
         async def mock_process_feed(feed, s, client):
             processed.append(feed.name)
 
-        with patch("reddit_feeds.runner.process_feed", side_effect=mock_process_feed):
+        with patch("runner.process_feed", side_effect=mock_process_feed):
             await run_once(settings)
 
         assert "python" in processed
@@ -136,7 +137,7 @@ class TestRunOnce:
             if feed.name == "python":
                 raise RuntimeError("python feed exploded")
 
-        with patch("reddit_feeds.runner.process_feed", side_effect=mock_process_feed):
+        with patch("runner.process_feed", side_effect=mock_process_feed):
             await run_once(settings)  # must not raise
 
         assert "python" in processed

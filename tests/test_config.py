@@ -4,8 +4,9 @@ from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
-from reddit_feeds.config.loader import load_settings
-from reddit_feeds.config.models import FeedConfig, Settings
+
+from config.loader import load_settings
+from config.models import FeedConfig, Settings
 
 
 class TestFeedConfig:
