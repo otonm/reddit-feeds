@@ -33,15 +33,14 @@ No code change needed. Changes:
 
 ### 3 — README Tailscale section: remove nginx, use direct file serving
 
-Replace the nginx + docker-compose approach with:
+Replace the nginx + docker-compose approach with a single command:
 
 ```bash
 docker compose up -d
-tailscale serve --https=443 /absolute/path/to/output
-tailscale funnel 443 on
+tailscale funnel /absolute/path/to/output
 ```
 
-Tailscale Serve serves a directory natively. Feeds available at `https://<machine>.ts.net/<slug>.xml`.
+`tailscale funnel` serves the directory directly over HTTPS and exposes it publicly. Feeds available at `https://<machine>.ts.net/<slug>.xml`.
 
 ### 4 — README: new Tailscale container deployment example
 
