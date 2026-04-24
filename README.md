@@ -200,6 +200,93 @@ To stop:
 tailscale funnel off
 ```
 
+### Fully containerised: Tailscale sidecar
+
+For deployments where Tailscale must also run inside Docker (e.g. a remote server with no Tailscale installed), use a `tailscale/tailscale` sidecar. It shares the output volume with the feeds container and serves it as a Funnel.
+
+**1. Create `ts-serve.json`:**
+
+```json
+{
+  "TCP": {
+    "443": {
+      "HTTPS": true
+    }
+  },
+  "Web": {
+    "${TS_CERT_DOMAIN}:443": {
+      "Handlers": {
+        "/": {
+          "Path": "/feeds/"
+        }
+      }
+    }
+  },
+  "AllowFunnel": {
+    "${TS_CERT_DOMAIN}:443": true
+  }
+}
+```
+
+`${TS_CERT_DOMAIN}` is resolved automatically by the Tailscale container at runtime.
+
+**2. Create `.env`:**
+
+```
+TS_AUTHKEY=tskey-auth-xxxxxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+Generate an auth key at [Tailscale admin → Settings → Keys](https://login.tailscale.com/admin/settings/keys). Use a reusable, pre-authenticated key for server deployments.
+
+**3. Use this `docker-compose.yml`:**
+
+```yaml
+services:
+  reddit-feeds:
+    image: ghcr.io/otonm/reddit-feeds:latest
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - feeds-output:/app/output
+    restart: unless-stopped
+    environment:
+      - REDDIT_FEEDS_INTERVAL
+      - REDDIT_FEEDS_LOG_LEVEL
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
+      interval: 2m
+      timeout: 10s
+      start_period: 2m
+      retries: 3
+
+  tailscale:
+    image: tailscale/tailscale
+    hostname: reddit-feeds
+    environment:
+      - TS_AUTHKEY=${TS_AUTHKEY}
+      - TS_STATE_DIR=/var/lib/tailscale
+      - TS_SERVE_CONFIG=/config/ts-serve.json
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./ts-serve.json:/config/ts-serve.json:ro
+      - feeds-output:/feeds:ro
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    restart: unless-stopped
+
+volumes:
+  tailscale-state:
+  feeds-output:
+```
+
+**4. Start:**
+
+```bash
+docker compose up -d
+```
+
+Feeds available at `https://reddit-feeds.<tailnet>.ts.net/earthporn.xml`.
+
 ---
 
 ## Development
