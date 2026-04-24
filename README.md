@@ -79,11 +79,23 @@ feeds:
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `output_dir` | path | `output/` | Directory where RSS `.xml` files are written |
-| `interval` | int (seconds) | `900` | Sleep between daemon runs (minimum 60) |
+| `interval` | int (seconds) | `900` | Sleep between daemon runs (minimum 300) |
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
 | `feeds[].url` | string | required | Reddit subreddit `.json` URL |
 | `feeds[].fetch_items` | int | `20` | Posts to fetch per run (1–100) |
+
+### Environment variables
+
+All three top-level scalar fields can be overridden at runtime without editing `config.yaml`:
+
+| Variable | Overrides | Example |
+|----------|-----------|---------|
+| `REDDIT_FEEDS_INTERVAL` | `interval` | `REDDIT_FEEDS_INTERVAL=1800` |
+| `REDDIT_FEEDS_LOG_LEVEL` | `log_level` | `REDDIT_FEEDS_LOG_LEVEL=DEBUG` |
+| `REDDIT_FEEDS_OUTPUT_DIR` | `output_dir` | `REDDIT_FEEDS_OUTPUT_DIR=/data/feeds` |
+
+Environment variables take precedence over `config.yaml`. Useful for Docker and CI overrides without remounting the config file.
 
 ---
 
