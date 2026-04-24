@@ -8,6 +8,7 @@ services:
     environment:
       - REDDIT_FEEDS_INTERVAL        # optional: overrides config.yaml interval
       - REDDIT_FEEDS_LOG_LEVEL       # optional: overrides config.yaml log_level
+      - REDDIT_FEEDS_OUTPUT_DIR      # optional: overrides config.yaml output_dir
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
       interval: 2m

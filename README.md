@@ -271,7 +271,6 @@ services:
       - feeds-output:/feeds:ro
     cap_add:
       - NET_ADMIN
-      - SYS_MODULE
     restart: unless-stopped
 
 volumes:
