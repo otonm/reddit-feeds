@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "src/**"
+      - "tests/**"
       - "Dockerfile"
       - "pyproject.toml"
       - ".github/workflows/docker.yml"
