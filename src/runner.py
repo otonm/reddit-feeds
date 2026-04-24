@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from pathlib import Path
 
 import httpx
 
@@ -27,6 +28,7 @@ async def run_once(settings: Settings) -> None:
             return_exceptions=True,
         )
     logger.info("Run complete in %.1fs", time.monotonic() - t0)
+    Path("/tmp/reddit-feeds.last_run").touch()  # noqa: S108, ASYNC240
 
 
 async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.AsyncClient) -> None:

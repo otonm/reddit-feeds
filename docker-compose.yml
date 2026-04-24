@@ -1,0 +1,7 @@
+services:
+  reddit-feeds:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER:-owner}/reddit-feeds:latest
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./output:/app/output
+    restart: unless-stopped
