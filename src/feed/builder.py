@@ -46,6 +46,7 @@ def _build_description(media_urls: list[str]) -> str:
 
 def build_feed(feed_config: FeedConfig, posts: list[MediaPost]) -> str:
     """Build an RSS 2.0 feed string from a list of MediaPost objects."""
+    logger.debug("Building RSS feed '%s' from %d post(s)", feed_config.name, len(posts))
     base_url = feed_config.url.removesuffix(".json")
 
     fg = FeedGenerator()
@@ -55,6 +56,7 @@ def build_feed(feed_config: FeedConfig, posts: list[MediaPost]) -> str:
     fg.description(f"Reddit feed for r/{feed_config.name}")
 
     for mp in posts:
+        logger.debug("  Entry %s: %d media URL(s)", mp.post.id, len(mp.media_urls))
         fe = fg.add_entry(order="append")
         fe.id(mp.post.permalink)
         fe.title(mp.post.title)
@@ -66,4 +68,6 @@ def build_feed(feed_config: FeedConfig, posts: list[MediaPost]) -> str:
             first_url = mp.media_urls[0]
             fe.enclosure(url=first_url, length="0", type=_infer_mime(first_url))
 
-    return fg.rss_str(pretty=True).decode()
+    xml = fg.rss_str(pretty=True).decode()
+    logger.info("Built RSS for '%s': %d entries, %d bytes", feed_config.name, len(posts), len(xml.encode()))
+    return xml

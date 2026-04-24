@@ -17,6 +17,8 @@ async def write_feed(xml: str, feed_config: FeedConfig, output_dir: Path) -> Non
     await aiofiles.os.makedirs(output_dir, exist_ok=True)
     filename = f"{slugify(feed_config.name)}.xml"
     path = output_dir / filename
+    byte_count = len(xml.encode("utf-8"))
+    logger.debug("Writing %d bytes to %s", byte_count, path)
     async with aiofiles.open(path, "w", encoding="utf-8") as f:
         await f.write(xml)
-    logger.debug("Wrote feed to %s", path)
+    logger.info("Wrote %s (%d bytes)", path, byte_count)

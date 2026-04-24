@@ -1,6 +1,7 @@
 """Tests for CLI entry point."""
 
 import asyncio
+import logging
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -67,6 +68,44 @@ class TestRunCommand:
 
         assert result.exit_code == 1
         assert "Invalid config" in result.output
+
+    def test_debug_flag_sets_debug_level(self, tmp_path):
+        settings = make_settings(tmp_path)
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("feeds: []")
+
+        with (
+            patch("cli.load_settings", return_value=settings),
+            patch("cli.run_once", AsyncMock()),
+            patch("cli.logging.basicConfig") as mock_basicconfig,
+        ):
+            result = runner.invoke(app, ["--config", str(config_file), "--debug"])
+
+        assert result.exit_code == 0
+        mock_basicconfig.assert_called_once()
+        assert mock_basicconfig.call_args.kwargs["level"] == logging.DEBUG
+
+    def test_quiet_flag_sets_warning_level(self, tmp_path):
+        settings = make_settings(tmp_path)
+        config_file = tmp_path / "config.yaml"
+        config_file.write_text("feeds: []")
+
+        with (
+            patch("cli.load_settings", return_value=settings),
+            patch("cli.run_once", AsyncMock()),
+            patch("cli.logging.basicConfig") as mock_basicconfig,
+        ):
+            result = runner.invoke(app, ["--config", str(config_file), "--quiet"])
+
+        assert result.exit_code == 0
+        mock_basicconfig.assert_called_once()
+        assert mock_basicconfig.call_args.kwargs["level"] == logging.WARNING
+
+    def test_debug_and_quiet_are_mutually_exclusive(self):
+        result = runner.invoke(app, ["--debug", "--quiet"])
+
+        assert result.exit_code == 1
+        assert "--debug and --quiet are mutually exclusive" in result.output
 
     def test_main_calls_app(self):
         with patch("cli.app") as mock_app:

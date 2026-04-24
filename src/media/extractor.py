@@ -23,11 +23,14 @@ def extract_media_urls(post: RedditPost) -> list[str]:
 
     Returns empty list if no media can be extracted. Safe to call from a thread pool.
     """
+    logger.debug("Extracting media from %s (hint=%s)", post.url, post.post_hint)
     urls, can_fallback = _try_gallery_dl(post.url)
 
     if not urls and can_fallback and post.post_hint == "image":
+        logger.debug("No gallery-dl match; falling back to direct URL for %s", post.url)
         urls = [post.url]
 
+    logger.debug("Extracted %d URL(s) from %s", len(urls), post.url)
     return urls
 
 
@@ -53,6 +56,7 @@ def _try_gallery_dl(url: str) -> tuple[list[str], bool]:
 
         extractor = gallery_dl_extractor.find(url)
         if extractor is None:
+            logger.debug("No gallery-dl extractor found for %s", url)
             return [], True
 
         urls: list[str] = []
@@ -62,6 +66,7 @@ def _try_gallery_dl(url: str) -> tuple[list[str], bool]:
             logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
             return [], False
         else:
+            logger.debug("gallery-dl found %d URL(s) for %s", len(urls), url)
             return urls, False
     except Exception:
         logger.warning("gallery-dl extraction failed for %s", url, exc_info=True)
