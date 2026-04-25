@@ -79,6 +79,19 @@ uv run python src/cli.py [OPTIONS]
 
 ---
 
+## Feed format
+
+Each RSS item contains:
+
+- **`<description>`** — embedded HTML (`<img>` or `<video>` tag) for direct in-reader media display
+- **`<enclosure>`** — first media URL as a typed enclosure for podcast-style clients
+- **`<guid>`** — permalink to the Reddit post (used by readers for deduplication, not for navigation)
+- No `<link>` — omitted intentionally so readers render the embedded media rather than opening Reddit
+
+Feeds are updated incrementally: posts and media URLs that have already been seen are not re-added. A post whose media was partially seen (e.g. a reposted gallery) will appear with only the new media items.
+
+---
+
 ## Docker
 
 Pull the latest image built by GitHub Actions on every push to `main`:

@@ -24,7 +24,7 @@ Reddit JSON API
  feed/writer.py        — writes <slug>.xml to output_dir asynchronously
 ```
 
-Posts with no resolvable media are silently skipped. Posts whose `post.url` is already in `SeenStore` skip gallery-dl entirely. Posts where all extracted media URLs are already seen are also skipped. Per-feed errors are caught and logged without stopping other feeds.
+Posts with no resolvable media are silently skipped. Posts whose `post.url` is already in `SeenStore` skip gallery-dl entirely. Posts where all extracted media URLs are already seen are also skipped. Posts where only *some* media URLs are new (partial reposts) are included with only the unseen media URLs. Cross-feed deduplication is best-effort: concurrent coroutines can interleave between a `SeenStore.contains()` check and the subsequent `SeenStore.add()`, allowing rare duplicates across feeds processed in the same cycle. Per-feed errors are caught and logged without stopping other feeds.
 
 ## Components
 
@@ -35,7 +35,7 @@ Posts with no resolvable media are silently skipped. Posts whose `post.url` is a
 | `src/store/models.py` | `StoredItem` dataclass — the persistent feed item representation; serialises to/from JSON |
 | `src/store/seen_store.py` | `SeenStore` — global in-memory `set[str]` of seen `post.url` + media URLs; backed by `{db_dir}/seen.json`; shared across all feeds within a cycle |
 | `src/store/feed_store.py` | `FeedStore` — per-feed ordered list of `StoredItem` backed by `{db_dir}/{slug}.json`; loaded at the start of each feed cycle and saved after new items are appended |
-| `src/feed/builder.py` | Produces RSS 2.0 XML from a `list[StoredItem]`; each item embeds `<img>` / `<video>` HTML in `<description>` and sets a first-media `<enclosure>` for podcast-style clients |
+| `src/feed/builder.py` | Produces RSS 2.0 XML from a `list[StoredItem]`; each item embeds `<img>` / `<video>` HTML in `<description>` and sets a first-media `<enclosure>` for podcast-style clients; no `<link>` element is set — omitting it prevents RSS readers from navigating to the Reddit post instead of rendering the embedded media; item identity uses `<guid>` (permalink) |
 | `src/feed/writer.py` | Async file write via aiofiles; filename is a URL-safe slug of the feed name (`EarthPorn` → `earthporn.xml`) |
 | `src/runner.py` | Orchestrates one full cycle: cleans up orphaned files for removed feeds, loads `SeenStore`, runs all feeds concurrently, saves `SeenStore`, touches `/tmp/reddit-feeds.last_run` |
 | `src/cli.py` | Typer CLI; one-shot and daemon mode; configures logging |
