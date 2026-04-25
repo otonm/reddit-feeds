@@ -50,10 +50,10 @@ configs:
       feeds:
         - name: EarthPorn
           url: https://www.reddit.com/r/EarthPorn/.json
-          fetch_items: 25
+          fetch_count: 25
         - name: AbandonedPorn
           url: https://www.reddit.com/r/AbandonedPorn/.json
-          fetch_items: 25
+          fetch_count: 25
 
   ts-serve-config:
     content: |

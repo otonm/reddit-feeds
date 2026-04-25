@@ -26,4 +26,4 @@ configs:
           url: https://www.reddit.com/r/EarthPorn/.json
         - name: AbandonedPorn
           url: https://www.reddit.com/r/AbandonedPorn/.json
-          fetch_items: 25
+          fetch_count: 25

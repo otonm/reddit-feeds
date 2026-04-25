@@ -4,7 +4,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, field_validator
 
-_MAX_FETCH_ITEMS = 100
+_MAX_FETCH_COUNT = 100
 _MIN_INTERVAL = 300
 
 
@@ -19,7 +19,7 @@ class FeedConfig(BaseModel):
     @classmethod
     def validate_fetch_count(cls, v: int) -> int:
         """Ensure fetch_count is between 1 and 100."""
-        if not 1 <= v <= _MAX_FETCH_ITEMS:
+        if not 1 <= v <= _MAX_FETCH_COUNT:
             msg = f"fetch_count must be between 1 and 100, got {v}"
             raise ValueError(msg)
         return v
