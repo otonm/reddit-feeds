@@ -2,7 +2,7 @@
 
 ## Pipeline
 
-Each configured feed runs through a four-stage async pipeline. All feeds execute concurrently via `asyncio.gather`.
+Each configured feed runs through an async pipeline. All feeds execute concurrently via `asyncio.gather`. `SeenStore` is shared across all feeds and loaded/saved once per cycle by `run_once`.
 
 ```
 Reddit JSON API
@@ -14,13 +14,17 @@ Reddit JSON API
  media/extractor.py    — gallery-dl resolves direct media URLs per post
       │
       ▼
+ store/seen_store.py   — two-level dedup: post.url pre-filter + per-media-URL filter
+ store/feed_store.py   — load existing items, append new ones, persist to db_dir
+      │
+      ▼
  feed/builder.py       — builds RSS 2.0 XML with <enclosure> + embedded HTML
       │
       ▼
  feed/writer.py        — writes <slug>.xml to output_dir asynchronously
 ```
 
-Posts with no resolvable media are silently skipped. Per-feed errors are caught and logged without stopping other feeds.
+Posts with no resolvable media are silently skipped. Posts whose `post.url` is already in `SeenStore` skip gallery-dl entirely. Posts where all extracted media URLs are already seen are also skipped. Per-feed errors are caught and logged without stopping other feeds.
 
 ## Components
 
@@ -28,11 +32,14 @@ Posts with no resolvable media are silently skipped. Per-feed errors are caught 
 |--------|------|
 | `src/reddit/client.py` | Fetches posts from Reddit's public `.json` endpoint using httpx; no auth |
 | `src/media/extractor.py` | Uses gallery-dl (1000+ supported sites) to resolve direct media URLs; runs in a thread pool via `run_in_executor` to avoid blocking the event loop |
-| `src/feed/builder.py` | Produces RSS 2.0 XML; each item embeds `<img>` / `<video>` HTML in `<description>` and sets a first-media `<enclosure>` for podcast-style clients |
+| `src/store/models.py` | `StoredItem` dataclass — the persistent feed item representation; serialises to/from JSON |
+| `src/store/seen_store.py` | `SeenStore` — global in-memory `set[str]` of seen `post.url` + media URLs; backed by `{db_dir}/seen.json`; shared across all feeds within a cycle |
+| `src/store/feed_store.py` | `FeedStore` — per-feed ordered list of `StoredItem` backed by `{db_dir}/{slug}.json`; loaded at the start of each feed cycle and saved after new items are appended |
+| `src/feed/builder.py` | Produces RSS 2.0 XML from a `list[StoredItem]`; each item embeds `<img>` / `<video>` HTML in `<description>` and sets a first-media `<enclosure>` for podcast-style clients |
 | `src/feed/writer.py` | Async file write via aiofiles; filename is a URL-safe slug of the feed name (`EarthPorn` → `earthporn.xml`) |
-| `src/runner.py` | Orchestrates one full cycle across all configured feeds; touches `/tmp/reddit-feeds.last_run` on completion (used by Docker health check) |
+| `src/runner.py` | Orchestrates one full cycle: cleans up orphaned files for removed feeds, loads `SeenStore`, runs all feeds concurrently, saves `SeenStore`, touches `/tmp/reddit-feeds.last_run` |
 | `src/cli.py` | Typer CLI; one-shot and daemon mode; configures logging |
-| `src/config/` | Pydantic models + YAML loader; env var overrides applied in `loader.py` |
+| `src/config/` | Pydantic models + YAML loader; env var overrides applied in `loader.py`; includes `db_dir` for the internal store directory |
 
 ## Docker image
 

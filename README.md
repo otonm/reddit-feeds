@@ -26,7 +26,8 @@ uv run python src/cli.py --config config.yaml
 Create `config.yaml` (see `config.yaml.example` for a starting point):
 
 ```yaml
-output_dir: output/
+output_dir: output/   # web-served RSS files
+db_dir: db/           # internal state — keep off the web server
 interval: 900
 log_level: INFO
 
@@ -40,7 +41,8 @@ feeds:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `output_dir` | path | `output/` | Directory where RSS `.xml` files are written |
+| `output_dir` | path | `output/` | Directory where RSS `.xml` files are written (web-served) |
+| `db_dir` | path | `db/` | Directory for internal state: global seen-URL set and per-feed item stores. Keep this off the web server. |
 | `interval` | int (seconds) | `900` | Sleep between daemon runs (minimum 300) |
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
@@ -56,6 +58,7 @@ Top-level scalar fields can be overridden without editing `config.yaml`:
 | `REDDIT_FEEDS_INTERVAL` | `interval` |
 | `REDDIT_FEEDS_LOG_LEVEL` | `log_level` |
 | `REDDIT_FEEDS_OUTPUT_DIR` | `output_dir` |
+| `REDDIT_FEEDS_DB_DIR` | `db_dir` |
 
 Environment variables take precedence over `config.yaml`.
 
@@ -91,8 +94,11 @@ docker run -d \
   --name reddit-feeds \
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
   -v $(pwd)/output:/app/output \
+  -v $(pwd)/db:/app/db \
   ghcr.io/otonm/reddit-feeds:latest
 ```
+
+`output/` holds the web-served RSS files. `db/` holds internal state (seen-URL index and per-feed item stores) — keep it off the web server.
 
 **Run with Docker Compose:**
 
