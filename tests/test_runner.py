@@ -3,11 +3,13 @@ from unittest.mock import AsyncMock, patch
 
 import feedparser
 import httpx
-import pytest
+from slugify import slugify
 
 from config.models import FeedConfig, Settings
 from reddit.models import RedditPost
 from runner import process_feed, run_once
+from store.feed_store import FeedStore
+from store.models import StoredItem
 from store.seen_store import SeenStore
 
 
@@ -149,9 +151,6 @@ class TestProcessFeed:
         seen = make_seen_store(tmp_path)
 
         # Seed the feed store with a prior item
-        from store.feed_store import FeedStore
-        from store.models import StoredItem
-        from slugify import slugify
         prior_item = StoredItem(
             id="prior",
             title="Prior Post",
@@ -222,7 +221,8 @@ class TestProcessFeed:
 class TestCleanupRemovedFeeds:
     async def test_cleanup_removes_orphaned_xml_and_json(self, tmp_path):
         """Files for feeds no longer in config are deleted on run_once."""
-        settings = make_settings(tmp_path, [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)])
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
 
         # Create orphaned output and db files for a feed that is no longer configured
         output_dir = settings.output_dir
@@ -249,7 +249,8 @@ class TestCleanupRemovedFeeds:
 
     async def test_cleanup_keeps_configured_feed_files(self, tmp_path):
         """Files for feeds still in config are not deleted."""
-        settings = make_settings(tmp_path, [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)])
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
 
         output_dir = settings.output_dir
         db_dir = settings.db_dir

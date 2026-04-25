@@ -72,6 +72,8 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
             logger.debug("[%s] Skipping post %s: no media", feed.name, post.id)
             continue
 
+        # Cross-feed dedup is best-effort: concurrent coroutines can interleave between
+        # contains() and add(), so rare duplicates across feeds are possible.
         new_urls = [u for u in urls if not seen.contains(u)]
         if not new_urls:
             logger.debug("[%s] Skipping post %s: all media URLs already seen", feed.name, post.id)
