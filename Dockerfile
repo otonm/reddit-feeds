@@ -19,7 +19,9 @@ WORKDIR /app
 
 RUN adduser -D -u 1000 appuser && \
     mkdir -p /app/output && \
-    chown appuser:appuser /app/output
+    mkdir -p /app/db && \
+    chown appuser:appuser /app/output && \
+    chown appuser:appuser /app/db
 
 COPY --from=builder /app/.venv /app/.venv
 COPY --from=builder /app/src /app/src
