@@ -26,6 +26,7 @@ services:
     environment:
       - TS_AUTHKEY=${TS_AUTHKEY}
       - TS_SERVE_CONFIG=/config/ts-serve.json
+      - TS_STATE_DIR=/var/lib/tailscale
       - TS_ENABLE_HEALTH_CHECK=true
     volumes:
       - tailscale-state:/var/lib/tailscale
@@ -36,7 +37,8 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     cap_add:
-      - NET_ADMIN
+      - net_admin
+      - sys_module
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:41234/healthz || exit 1"]
