@@ -40,6 +40,7 @@ class TestSettings:
     def test_settings_defaults(self):
         s = Settings(feeds=[])
         assert s.output_dir == Path("output")
+        assert s.db_dir == Path("db")
         assert s.interval == 900
         assert s.log_level == "INFO"
 
@@ -62,6 +63,14 @@ class TestSettings:
     def test_interval_at_299_raises(self):
         with pytest.raises(ValidationError):
             Settings(feeds=[], interval=299)
+
+    def test_settings_db_dir_default(self):
+        s = Settings()
+        assert s.db_dir == Path("db")
+
+    def test_settings_custom_db_dir(self):
+        s = Settings(db_dir=Path("/data/db"))
+        assert s.db_dir == Path("/data/db")
 
 
 class TestLoadSettings:
@@ -104,3 +113,10 @@ class TestLoadSettings:
         config.write_text("feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n    fetch_count: 200\n")
         with pytest.raises(ValidationError):
             load_settings(config)
+
+    def test_env_var_overrides_db_dir(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text("feeds: []\ninterval: 300\n")
+        monkeypatch.setenv("REDDIT_FEEDS_DB_DIR", "/tmp/mydb")
+        settings = load_settings(config)
+        assert settings.db_dir == Path("/tmp/mydb")

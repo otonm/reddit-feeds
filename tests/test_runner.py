@@ -11,7 +11,8 @@ from runner import process_feed, run_once
 
 def make_settings(tmp_path: Path, feeds: list[FeedConfig] | None = None) -> Settings:
     return Settings(
-        output_dir=tmp_path,
+        output_dir=tmp_path / "output",
+        db_dir=tmp_path / "db",
         interval=900,
         feeds=feeds or [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)],
         log_level="INFO",
@@ -47,7 +48,7 @@ class TestProcessFeed:
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client)
 
-        assert (tmp_path / "python.xml").exists()
+        assert (tmp_path / "output" / "python.xml").exists()
 
     async def test_process_feed_skips_posts_with_no_media(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)

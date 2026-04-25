@@ -29,6 +29,7 @@ class Settings(BaseModel):
     """Top-level application settings."""
 
     output_dir: Path = Path("output")
+    db_dir: Path = Path("db")
     interval: int = 900
     feeds: list[FeedConfig] = []
     log_level: str = "INFO"

@@ -25,6 +25,7 @@ def _apply_env_overrides(raw: dict) -> None:
     """Override top-level scalar fields from REDDIT_FEEDS_* environment variables."""
     overrides: list[tuple[str, str]] = [
         ("REDDIT_FEEDS_OUTPUT_DIR", "output_dir"),
+        ("REDDIT_FEEDS_DB_DIR", "db_dir"),
         ("REDDIT_FEEDS_INTERVAL", "interval"),
         ("REDDIT_FEEDS_LOG_LEVEL", "log_level"),
     ]

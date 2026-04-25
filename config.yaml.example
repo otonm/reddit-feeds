@@ -1,7 +1,8 @@
 # Reddit Feeds Configuration
 # Copy this file to config.yaml and customize
 
-output_dir: output/  # Output directory for RSS files (default: output/)
+output_dir: output/  # Output directory for web-served RSS files (default: output/)
+db_dir: db/          # Internal database directory, keep this off the web (default: db/)
 
 feeds:
   # Example feed with all options specified
