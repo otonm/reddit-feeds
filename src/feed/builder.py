@@ -7,7 +7,7 @@ from urllib.parse import urlparse
 from feedgen.feed import FeedGenerator
 
 from config.models import FeedConfig
-from feed.models import MediaPost
+from store.models import StoredItem
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +44,9 @@ def _build_description(media_urls: list[str]) -> str:
     return "".join(parts)
 
 
-def build_feed(feed_config: FeedConfig, posts: list[MediaPost]) -> str:
-    """Build an RSS 2.0 feed string from a list of MediaPost objects."""
-    logger.debug("Building RSS feed '%s' from %d post(s)", feed_config.name, len(posts))
+def build_feed(feed_config: FeedConfig, items: list[StoredItem]) -> str:
+    """Build an RSS 2.0 feed string from a list of StoredItem objects."""
+    logger.debug("Building RSS feed '%s' from %d item(s)", feed_config.name, len(items))
     base_url = feed_config.url.removesuffix(".json")
 
     fg = FeedGenerator()
@@ -55,19 +55,19 @@ def build_feed(feed_config: FeedConfig, posts: list[MediaPost]) -> str:
     fg.link(href=base_url, rel="alternate")
     fg.description(f"Reddit feed for r/{feed_config.name}")
 
-    for mp in posts:
-        logger.debug("  Entry %s: %d media URL(s)", mp.post.id, len(mp.media_urls))
+    for item in items:
+        logger.debug("  Entry %s: %d media URL(s)", item.id, len(item.media_urls))
         fe = fg.add_entry(order="append")
-        fe.id(mp.post.permalink)
-        fe.title(mp.post.title)
-        fe.link(href=mp.post.permalink)
-        fe.published(datetime.fromtimestamp(mp.post.created_utc, tz=UTC))
-        fe.description(_build_description(mp.media_urls))
+        fe.id(item.permalink)
+        fe.title(item.title)
+        fe.link(href=item.permalink)
+        fe.published(datetime.fromtimestamp(item.created_utc, tz=UTC))
+        fe.description(_build_description(item.media_urls))
 
-        if mp.media_urls:
-            first_url = mp.media_urls[0]
+        if item.media_urls:
+            first_url = item.media_urls[0]
             fe.enclosure(url=first_url, length="0", type=_infer_mime(first_url))
 
     xml = fg.rss_str(pretty=True).decode()
-    logger.info("Built RSS for '%s': %d entries, %d bytes", feed_config.name, len(posts), len(xml.encode()))
+    logger.info("Built RSS for '%s': %d entries, %d bytes", feed_config.name, len(items), len(xml.encode()))
     return xml

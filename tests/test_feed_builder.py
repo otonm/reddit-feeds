@@ -2,26 +2,23 @@ import feedparser
 
 from config.models import FeedConfig
 from feed.builder import _infer_mime, build_feed
-from feed.models import MediaPost
 from feed.writer import write_feed
-from reddit.models import RedditPost
+from store.models import StoredItem
 
 
 def make_feed_config(name: str = "python") -> FeedConfig:
     return FeedConfig(name=name, url=f"https://reddit.com/r/{name}/.json")
 
 
-def make_media_post(media_urls: list[str], **overrides) -> MediaPost:
-    post = RedditPost(
-        id=overrides.get("id", "abc123"),
-        title=overrides.get("title", "Test Post"),
-        author=overrides.get("author", "user"),
-        permalink=overrides.get("permalink", "https://reddit.com/r/python/comments/abc123/test/"),
-        url=overrides.get("url", media_urls[0] if media_urls else ""),
-        created_utc=overrides.get("created_utc", 1700000000.0),
-        post_hint=overrides.get("post_hint", "image"),
-    )
-    return MediaPost(post=post, media_urls=media_urls)
+def make_stored_item(**kwargs) -> StoredItem:
+    defaults = {
+        "id": "post_id_1",
+        "title": "Test Post Title",
+        "permalink": "https://reddit.com/r/test/comments/abc/test/",
+        "created_utc": 1700000000.0,
+        "media_urls": ["https://i.redd.it/test.jpg"],
+    }
+    return StoredItem(**{**defaults, **kwargs})
 
 
 class TestBuildFeed:
@@ -32,7 +29,7 @@ class TestBuildFeed:
         assert "reddit.com/r/python" in parsed.feed.link
 
     def test_single_image_item_has_enclosure(self):
-        posts = [make_media_post(["https://i.redd.it/abc123.jpg"])]
+        posts = [make_stored_item(media_urls=["https://i.redd.it/abc123.jpg"])]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
 
@@ -42,14 +39,14 @@ class TestBuildFeed:
         assert parsed.entries[0].enclosures[0].type == "image/jpeg"
 
     def test_single_image_in_description(self):
-        posts = [make_media_post(["https://i.redd.it/abc123.jpg"])]
+        posts = [make_stored_item(media_urls=["https://i.redd.it/abc123.jpg"])]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
         assert 'src="https://i.redd.it/abc123.jpg"' in parsed.entries[0].summary
 
     def test_gallery_all_images_in_description(self):
         urls = ["https://i.redd.it/img1.jpg", "https://i.redd.it/img2.png", "https://i.redd.it/img3.gif"]
-        posts = [make_media_post(urls)]
+        posts = [make_stored_item(media_urls=urls)]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
 
@@ -61,27 +58,27 @@ class TestBuildFeed:
 
     def test_gallery_enclosure_is_first_url(self):
         urls = ["https://i.redd.it/first.jpg", "https://i.redd.it/second.png"]
-        posts = [make_media_post(urls)]
+        posts = [make_stored_item(media_urls=urls)]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
         assert parsed.entries[0].enclosures[0].url == "https://i.redd.it/first.jpg"
 
     def test_video_url_uses_video_tag_in_description(self):
-        posts = [make_media_post(["https://v.redd.it/abc123.mp4"], post_hint=None)]
+        posts = [make_stored_item(media_urls=["https://v.redd.it/abc123.mp4"])]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
         assert "<video" in parsed.entries[0].summary
 
     def test_video_enclosure_has_video_mime(self):
-        posts = [make_media_post(["https://v.redd.it/abc.mp4"], post_hint=None)]
+        posts = [make_stored_item(media_urls=["https://v.redd.it/abc.mp4"])]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
         assert parsed.entries[0].enclosures[0].type == "video/mp4"
 
     def test_multiple_posts_all_appear(self):
         posts = [
-            make_media_post(["https://i.redd.it/a.jpg"], id="a", title="Post A"),
-            make_media_post(["https://i.redd.it/b.png"], id="b", title="Post B"),
+            make_stored_item(media_urls=["https://i.redd.it/a.jpg"], id="a", title="Post A"),
+            make_stored_item(media_urls=["https://i.redd.it/b.png"], id="b", title="Post B"),
         ]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
@@ -94,7 +91,7 @@ class TestBuildFeed:
         assert len(parsed.entries) == 0
 
     def test_post_with_empty_media_urls_has_no_enclosure(self):
-        posts = [make_media_post([])]
+        posts = [make_stored_item(media_urls=[])]
         xml = build_feed(make_feed_config(), posts)
         parsed = feedparser.parse(xml)
         assert len(parsed.entries) == 1
