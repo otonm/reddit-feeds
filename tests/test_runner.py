@@ -3,10 +3,12 @@ from unittest.mock import AsyncMock, patch
 
 import feedparser
 import httpx
+import pytest
 
 from config.models import FeedConfig, Settings
 from reddit.models import RedditPost
 from runner import process_feed, run_once
+from store.seen_store import SeenStore
 
 
 def make_settings(tmp_path: Path, feeds: list[FeedConfig] | None = None) -> Settings:
@@ -33,33 +35,36 @@ def make_reddit_post(**overrides) -> RedditPost:
     return RedditPost(**defaults)
 
 
+def make_seen_store(tmp_path: Path) -> SeenStore:
+    return SeenStore(tmp_path / "db")
+
+
 class TestProcessFeed:
     async def test_process_feed_writes_file(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
         post = make_reddit_post()
 
         with (
             patch("runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch(
-                "runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
-            ),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])),
         ):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client)
+                await process_feed(config, settings, client, seen)
 
-        assert (tmp_path / "output" / "python.xml").exists()
+        assert (settings.output_dir / "python.xml").exists()
 
     async def test_process_feed_skips_posts_with_no_media(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
         post = make_reddit_post()
 
         written_posts: list = []
 
         async def mock_write(xml, fc, od):
-            parsed = feedparser.parse(xml)
-            written_posts.extend(parsed.entries)
+            written_posts.extend(feedparser.parse(xml).entries)
 
         with (
             patch("runner.fetch_posts", AsyncMock(return_value=[post])),
@@ -67,21 +72,125 @@ class TestProcessFeed:
             patch("runner.write_feed", side_effect=mock_write),
         ):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client)
+                await process_feed(config, settings, client, seen)
 
         assert written_posts == []
+
+    async def test_process_feed_skips_post_whose_url_is_already_seen(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
+        post = make_reddit_post(url="https://i.redd.it/abc.jpg")
+        seen.add("https://i.redd.it/abc.jpg")  # mark post.url as seen
+
+        mock_extract = AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
+        with (
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", mock_extract),
+            patch("runner.write_feed", AsyncMock()),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client, seen)
+
+        mock_extract.assert_not_called()  # fast pre-filter: no extraction for seen posts
+
+    async def test_process_feed_skips_when_all_media_urls_already_seen(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
+        post = make_reddit_post(url="https://i.redd.it/abc.jpg")
+        # post.url not seen, but its media URLs are
+        seen.add("https://i.redd.it/media1.jpg")
+        seen.add("https://i.redd.it/media2.jpg")
+
+        written_posts: list = []
+
+        async def mock_write(xml, fc, od):
+            written_posts.extend(feedparser.parse(xml).entries)
+
+        with (
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/media1.jpg", "https://i.redd.it/media2.jpg"])),
+            patch("runner.write_feed", side_effect=mock_write),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client, seen)
+
+        assert written_posts == []
+
+    async def test_process_feed_partial_repost_shows_only_new_media(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
+        post = make_reddit_post(url="https://i.redd.it/new_gallery.jpg")
+        seen.add("https://i.redd.it/media1.jpg")  # one of the gallery images is already seen
+
+        captured_items: list = []
+
+        async def mock_write(xml, fc, od):
+            captured_items.extend(feedparser.parse(xml).entries)
+
+        with (
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/media1.jpg", "https://i.redd.it/media2.jpg"])),
+            patch("runner.write_feed", side_effect=mock_write),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client, seen)
+
+        # Post is included, but only with the new media URL
+        assert len(captured_items) == 1
+        assert "media2.jpg" in captured_items[0].get("summary", "")
+        assert "media1.jpg" not in captured_items[0].get("summary", "")
+
+    async def test_process_feed_appends_to_existing_items(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
+
+        # Seed the feed store with a prior item
+        from store.feed_store import FeedStore
+        from store.models import StoredItem
+        from slugify import slugify
+        prior_item = StoredItem(
+            id="prior",
+            title="Prior Post",
+            permalink="https://reddit.com/r/python/comments/prior/",
+            created_utc=1699000000.0,
+            media_urls=["https://i.redd.it/prior.jpg"],
+        )
+        store = FeedStore(settings.db_dir, slugify(config.name))
+        await store.save([prior_item])
+
+        new_post = make_reddit_post(id="new", url="https://i.redd.it/new.jpg", created_utc=1700000000.0)
+        written_entries: list = []
+
+        async def mock_write(xml, fc, od):
+            written_entries.extend(feedparser.parse(xml).entries)
+
+        with (
+            patch("runner.fetch_posts", AsyncMock(return_value=[new_post])),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/new.jpg"])),
+            patch("runner.write_feed", side_effect=mock_write),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client, seen)
+
+        assert len(written_entries) == 2  # prior + new
 
     async def test_process_feed_fetch_failure_does_not_raise(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
 
         with patch("runner.fetch_posts", AsyncMock(side_effect=Exception("network error"))):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client)  # must not raise
+                await process_feed(config, settings, client, seen)  # must not raise
 
     async def test_process_feed_extraction_failure_skips_post(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
         post = make_reddit_post()
 
         with (
@@ -90,7 +199,7 @@ class TestProcessFeed:
             patch("runner.write_feed", AsyncMock()) as mock_write,
         ):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client)
+                await process_feed(config, settings, client, seen)
 
         xml_arg = mock_write.call_args[0][0]
         assert len(feedparser.parse(xml_arg).entries) == 0
@@ -98,6 +207,7 @@ class TestProcessFeed:
     async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
         post = make_reddit_post()
 
         with (
@@ -106,7 +216,58 @@ class TestProcessFeed:
             patch("runner.write_feed", AsyncMock(side_effect=OSError("disk full"))),
         ):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client)  # must not raise
+                await process_feed(config, settings, client, seen)  # must not raise
+
+
+class TestCleanupRemovedFeeds:
+    async def test_cleanup_removes_orphaned_xml_and_json(self, tmp_path):
+        """Files for feeds no longer in config are deleted on run_once."""
+        settings = make_settings(tmp_path, [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)])
+
+        # Create orphaned output and db files for a feed that is no longer configured
+        output_dir = settings.output_dir
+        db_dir = settings.db_dir
+        output_dir.mkdir(parents=True)
+        db_dir.mkdir(parents=True)
+        orphan_xml = output_dir / "rust.xml"
+        orphan_json = db_dir / "rust.json"
+        orphan_xml.write_text("<rss/>")
+        orphan_json.write_text("[]")
+        # seen.json must be preserved
+        seen_json = db_dir / "seen.json"
+        seen_json.write_text("[]")
+
+        async def mock_process_feed(feed, s, client, seen):
+            pass
+
+        with patch("runner.process_feed", side_effect=mock_process_feed):
+            await run_once(settings)
+
+        assert not orphan_xml.exists(), "orphaned XML should have been removed"
+        assert not orphan_json.exists(), "orphaned JSON store should have been removed"
+        assert seen_json.exists(), "seen.json must not be removed"
+
+    async def test_cleanup_keeps_configured_feed_files(self, tmp_path):
+        """Files for feeds still in config are not deleted."""
+        settings = make_settings(tmp_path, [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)])
+
+        output_dir = settings.output_dir
+        db_dir = settings.db_dir
+        output_dir.mkdir(parents=True)
+        db_dir.mkdir(parents=True)
+        kept_xml = output_dir / "python.xml"
+        kept_json = db_dir / "python.json"
+        kept_xml.write_text("<rss/>")
+        kept_json.write_text("[]")
+
+        async def mock_process_feed(feed, s, client, seen):
+            pass
+
+        with patch("runner.process_feed", side_effect=mock_process_feed):
+            await run_once(settings)
+
+        assert kept_xml.exists(), "configured feed XML should not be removed"
+        assert kept_json.exists(), "configured feed JSON store should not be removed"
 
 
 class TestRunOnce:
@@ -117,7 +278,7 @@ class TestRunOnce:
 
         processed: list[str] = []
 
-        async def mock_process_feed(feed, s, client):
+        async def mock_process_feed(feed, s, client, seen):
             processed.append(feed.name)
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -133,7 +294,7 @@ class TestRunOnce:
 
         processed: list[str] = []
 
-        async def mock_process_feed(feed, s, client):
+        async def mock_process_feed(feed, s, client, seen):
             processed.append(feed.name)
             if feed.name == "python":
                 raise RuntimeError("python feed exploded")
@@ -143,3 +304,17 @@ class TestRunOnce:
 
         assert "python" in processed
         assert "rust" in processed
+
+    async def test_run_once_saves_seen_store(self, tmp_path):
+        settings = make_settings(tmp_path)
+
+        async def mock_process_feed(feed, s, client, seen):
+            seen.add("https://i.redd.it/tracked.jpg")
+
+        with patch("runner.process_feed", side_effect=mock_process_feed):
+            await run_once(settings)
+
+        # seen.json must exist and contain the URL added during processing
+        seen2 = SeenStore(settings.db_dir)
+        await seen2.load()
+        assert seen2.contains("https://i.redd.it/tracked.jpg")
