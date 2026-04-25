@@ -22,8 +22,13 @@ class FeedStore:
         """Load items from disk. Returns empty list if file does not exist."""
         if not self._path.exists():
             return []
-        async with aiofiles.open(self._path, "r", encoding="utf-8") as f:
-            data = json.loads(await f.read())
+        async with aiofiles.open(self._path, encoding="utf-8") as f:
+            content = await f.read()
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            logger.warning("Corrupt feed store at %s, starting fresh", self._path)
+            return []
         items = [StoredItem.from_dict(d) for d in data]
         logger.debug("Loaded %d items from %s", len(items), self._path)
         return items

@@ -22,8 +22,14 @@ class SeenStore:
         if not self._path.exists():
             self._seen = set()
             return
-        async with aiofiles.open(self._path, "r", encoding="utf-8") as f:
-            data = json.loads(await f.read())
+        async with aiofiles.open(self._path, encoding="utf-8") as f:
+            content = await f.read()
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            logger.warning("Corrupt seen store at %s, starting fresh", self._path)
+            self._seen = set()
+            return
         self._seen = set(data)
         logger.debug("Loaded %d seen URLs from %s", len(self._seen), self._path)
 

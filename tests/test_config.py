@@ -117,6 +117,6 @@ class TestLoadSettings:
     def test_env_var_overrides_db_dir(self, tmp_path, monkeypatch):
         config = tmp_path / "config.yaml"
         config.write_text("feeds: []\ninterval: 300\n")
-        monkeypatch.setenv("REDDIT_FEEDS_DB_DIR", "/tmp/mydb")
+        monkeypatch.setenv("REDDIT_FEEDS_DB_DIR", str(tmp_path / "mydb"))
         settings = load_settings(config)
-        assert settings.db_dir == Path("/tmp/mydb")
+        assert settings.db_dir == Path(tmp_path / "mydb")

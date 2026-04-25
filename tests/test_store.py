@@ -1,8 +1,6 @@
 """Tests for the store module (StoredItem, SeenStore, FeedStore)."""
 
-from pathlib import Path
 
-import pytest
 
 from store.feed_store import FeedStore
 from store.models import StoredItem
@@ -79,6 +77,13 @@ class TestSeenStore:
         await store.save()
         assert (db_dir / "seen.json").exists()
 
+    async def test_corrupt_file_starts_fresh(self, tmp_path):
+        corrupt = tmp_path / "seen.json"
+        corrupt.write_text("not valid json{{{")
+        store = SeenStore(tmp_path)
+        await store.load()
+        assert not store.contains("https://example.com/img.jpg")
+
 
 class TestFeedStore:
     async def test_empty_when_file_missing(self, tmp_path):
@@ -113,3 +118,10 @@ class TestFeedStore:
         ]
         await store.save(items)
         assert await store.load() == items
+
+    async def test_corrupt_file_returns_empty(self, tmp_path):
+        corrupt = tmp_path / "my-feed.json"
+        corrupt.write_text("not valid json{{{")
+        store = FeedStore(tmp_path, "my-feed")
+        items = await store.load()
+        assert items == []

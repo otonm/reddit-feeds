@@ -4,6 +4,7 @@ services:
     container_name: reddit-feeds
     volumes:
       - feeds-output:/app/output
+      - feeds-db:/app/db
     configs:
       - source: feeds-config
         target: /app/config.yaml
@@ -70,3 +71,4 @@ configs:
 volumes:
   tailscale-state:
   feeds-output:
+  feeds-db:
