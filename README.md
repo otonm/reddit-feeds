@@ -33,7 +33,7 @@ log_level: INFO
 feeds:
   - name: EarthPorn
     url: https://www.reddit.com/r/EarthPorn/.json
-    fetch_items: 25
+    fetch_count: 25
   - name: AbandonedPorn
     url: https://www.reddit.com/r/AbandonedPorn/.json
 ```
@@ -45,7 +45,7 @@ feeds:
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
 | `feeds[].url` | string | required | Reddit subreddit `.json` URL |
-| `feeds[].fetch_items` | int | `20` | Posts to fetch per run (1–100) |
+| `feeds[].fetch_count` | int | `20` | Posts to fetch per run (1–100) |
 
 ### Environment variables
 
@@ -156,7 +156,7 @@ configs:
           url: https://www.reddit.com/r/EarthPorn/.json
         - name: AbandonedPorn
           url: https://www.reddit.com/r/AbandonedPorn/.json
-          fetch_items: 25
+          fetch_count: 25
 ```
 
 **3. Start:**

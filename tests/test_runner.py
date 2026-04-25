@@ -13,7 +13,7 @@ def make_settings(tmp_path: Path, feeds: list[FeedConfig] | None = None) -> Sett
     return Settings(
         output_dir=tmp_path,
         interval=900,
-        feeds=feeds or [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)],
+        feeds=feeds or [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)],
         log_level="INFO",
     )
 
@@ -34,7 +34,7 @@ def make_reddit_post(**overrides) -> RedditPost:
 
 class TestProcessFeed:
     async def test_process_feed_writes_file(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         post = make_reddit_post()
 
@@ -50,7 +50,7 @@ class TestProcessFeed:
         assert (tmp_path / "python.xml").exists()
 
     async def test_process_feed_skips_posts_with_no_media(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         post = make_reddit_post()
 
@@ -71,7 +71,7 @@ class TestProcessFeed:
         assert written_posts == []
 
     async def test_process_feed_fetch_failure_does_not_raise(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
 
         with patch("runner.fetch_posts", AsyncMock(side_effect=Exception("network error"))):
@@ -79,7 +79,7 @@ class TestProcessFeed:
                 await process_feed(config, settings, client)  # must not raise
 
     async def test_process_feed_extraction_failure_skips_post(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         post = make_reddit_post()
 
@@ -95,7 +95,7 @@ class TestProcessFeed:
         assert len(feedparser.parse(xml_arg).entries) == 0
 
     async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         post = make_reddit_post()
 
@@ -110,8 +110,8 @@ class TestProcessFeed:
 
 class TestRunOnce:
     async def test_run_once_processes_all_feeds(self, tmp_path):
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
-        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_items=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
         settings = make_settings(tmp_path, [feed1, feed2])
 
         processed: list[str] = []
@@ -126,8 +126,8 @@ class TestRunOnce:
         assert "rust" in processed
 
     async def test_run_once_one_feed_fails_others_complete(self, tmp_path):
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=5)
-        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_items=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
         settings = make_settings(tmp_path, [feed1, feed2])
 
         processed: list[str] = []

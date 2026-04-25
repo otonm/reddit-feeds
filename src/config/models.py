@@ -13,14 +13,14 @@ class FeedConfig(BaseModel):
 
     name: str
     url: str
-    fetch_items: int = 20
+    fetch_count: int = 20
 
-    @field_validator("fetch_items")
+    @field_validator("fetch_count")
     @classmethod
-    def validate_fetch_items(cls, v: int) -> int:
-        """Ensure fetch_items is between 1 and 100."""
+    def validate_fetch_count(cls, v: int) -> int:
+        """Ensure fetch_count is between 1 and 100."""
         if not 1 <= v <= _MAX_FETCH_ITEMS:
-            msg = f"fetch_items must be between 1 and 100, got {v}"
+            msg = f"fetch_count must be between 1 and 100, got {v}"
             raise ValueError(msg)
         return v
 

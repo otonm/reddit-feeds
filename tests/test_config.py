@@ -13,27 +13,27 @@ class TestFeedConfig:
     def test_valid_feed_config(self):
         fc = FeedConfig(name="python", url="https://reddit.com/r/python/.json")
         assert fc.name == "python"
-        assert fc.fetch_items == 20  # default
+        assert fc.fetch_count == 20  # default
 
-    def test_fetch_items_default_is_20(self):
+    def test_fetch_count_default_is_20(self):
         fc = FeedConfig(name="python", url="https://reddit.com/r/python/.json")
-        assert fc.fetch_items == 20
+        assert fc.fetch_count == 20
 
-    def test_fetch_items_too_low_raises(self):
+    def test_fetch_count_too_low_raises(self):
         with pytest.raises(ValidationError):
-            FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=0)
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=0)
 
-    def test_fetch_items_too_high_raises(self):
+    def test_fetch_count_too_high_raises(self):
         with pytest.raises(ValidationError):
-            FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=101)
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=101)
 
-    def test_fetch_items_at_boundary_1(self):
-        fc = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=1)
-        assert fc.fetch_items == 1
+    def test_fetch_count_at_boundary_1(self):
+        fc = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=1)
+        assert fc.fetch_count == 1
 
-    def test_fetch_items_at_boundary_100(self):
-        fc = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_items=100)
-        assert fc.fetch_items == 100
+    def test_fetch_count_at_boundary_100(self):
+        fc = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=100)
+        assert fc.fetch_count == 100
 
 
 class TestSettings:
@@ -70,7 +70,7 @@ class TestLoadSettings:
         assert settings.interval == 600
         assert len(settings.feeds) == 1
         assert settings.feeds[0].name == "python"
-        assert settings.feeds[0].fetch_items == 10
+        assert settings.feeds[0].fetch_count == 10
 
     def test_load_config_missing_file(self, tmp_path):
         with pytest.raises(FileNotFoundError, match="Config file not found"):
@@ -99,8 +99,8 @@ class TestLoadSettings:
         settings = load_settings(sample_config_yaml)
         assert settings.log_level == "DEBUG"
 
-    def test_invalid_fetch_items_raises_on_load(self, tmp_path):
+    def test_invalid_fetch_count_raises_on_load(self, tmp_path):
         config = tmp_path / "config.yaml"
-        config.write_text("feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n    fetch_items: 200\n")
+        config.write_text("feeds:\n  - name: test\n    url: https://reddit.com/r/test/.json\n    fetch_count: 200\n")
         with pytest.raises(ValidationError):
             load_settings(config)

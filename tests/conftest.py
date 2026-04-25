@@ -12,7 +12,7 @@ def sample_config_yaml(tmp_path: Path) -> Path:
         "feeds:\n"
         "  - name: python\n"
         "    url: https://reddit.com/r/python/.json\n"
-        "    fetch_items: 10\n"
+        "    fetch_count: 10\n"
     )
     return config
 

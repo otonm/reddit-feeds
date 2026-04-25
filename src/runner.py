@@ -34,9 +34,9 @@ async def run_once(settings: Settings) -> None:
 async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.AsyncClient) -> None:
     """Fetch, extract, build, and write a single feed. Logs and returns on any error."""
     logger.debug("[%s] Starting pipeline (url=%s)", feed.name, feed.url)
-    logger.info("[%s] Fetching %d posts from %s", feed.name, feed.fetch_items, feed.url)
+    logger.info("[%s] Fetching %d posts from %s", feed.name, feed.fetch_count, feed.url)
     try:
-        posts = await fetch_posts(feed.url, feed.fetch_items, client)
+        posts = await fetch_posts(feed.url, feed.fetch_count, client)
         logger.debug("[%s] Received %d posts from Reddit", feed.name, len(posts))
     except Exception:
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)

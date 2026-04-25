@@ -7,12 +7,12 @@ feeds:
   # Example feed with all options specified
   - name: EarthPorn
     url: https://www.reddit.com/r/EarthPorn/.json
-    fetch_items: 25      # Number of posts to fetch (default: 20, max: 100)
+    fetch_count: 25      # Posts to fetch per run (default: 20, max: 100)
 
   # Example feed using defaults
   - name: AbandonedPorn
     url: https://www.reddit.com/r/AbandonedPorn/.json
-    # fetch_items will use default (20)
+    # fetch_count will use default (20)
 
   # Add more feeds as needed
   # - name: HistoryPorn
