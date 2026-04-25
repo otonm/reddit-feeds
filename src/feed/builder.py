@@ -60,7 +60,6 @@ def build_feed(feed_config: FeedConfig, items: list[StoredItem]) -> str:
         fe = fg.add_entry(order="append")
         fe.id(item.permalink)
         fe.title(item.title)
-        fe.link(href=item.permalink)
         fe.published(datetime.fromtimestamp(item.created_utc, tz=UTC))
         fe.description(_build_description(item.media_urls))
 

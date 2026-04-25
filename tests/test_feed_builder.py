@@ -90,6 +90,12 @@ class TestBuildFeed:
         assert parsed.feed.title == "r/python"
         assert len(parsed.entries) == 0
 
+    def test_item_has_no_link(self):
+        posts = [make_stored_item()]
+        xml = build_feed(make_feed_config(), posts)
+        parsed = feedparser.parse(xml)
+        assert not parsed.entries[0].get("link")
+
     def test_post_with_empty_media_urls_has_no_enclosure(self):
         posts = [make_stored_item(media_urls=[])]
         xml = build_feed(make_feed_config(), posts)
