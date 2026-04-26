@@ -46,7 +46,7 @@ feeds:
 | `interval` | int (seconds) | `900` | Sleep between daemon runs (minimum 300) |
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `reddit_fetch_gap` | float (seconds) | `2.0` | Minimum delay between Reddit API calls across feeds; reduces rate-limit (429) errors |
-| `base_url` | string | `null` | Public base URL for feed links (e.g. `https://host.ts.net`); enables `feeds.opml` generation when set |
+| `base_url` | string | `null` | Public base URL used to construct `xmlUrl` in `feeds.opml`; enables OPML generation when set |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
 | `feeds[].url` | string | required | Reddit subreddit `.json` URL |
 | `feeds[].fetch_count` | int | `20` | Posts to fetch per run (1–100) |
@@ -175,6 +175,7 @@ Find the `configs.feeds-config.content` block and replace the example feeds with
 configs:
   feeds-config:
     content: |
+      # base_url: https://reddit-feeds.<tailnet>.ts.net  # enables feeds.opml generation
       feeds:
         - name: EarthPorn
           url: https://www.reddit.com/r/EarthPorn/.json
