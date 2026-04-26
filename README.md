@@ -58,11 +58,11 @@ Top-level scalar fields can be overridden without editing `config.yaml`:
 |----------|-----------|
 | `REDDIT_FEEDS_INTERVAL` | `interval` |
 | `REDDIT_FEEDS_LOG_LEVEL` | `log_level` |
-| `REDDIT_FEEDS_OUTPUT_DIR` | `output_dir` |
-| `REDDIT_FEEDS_DB_DIR` | `db_dir` |
 | `REDDIT_FEEDS_FETCH_GAP` | `reddit_fetch_gap` |
 
 Environment variables take precedence over `config.yaml`.
+
+`output_dir` and `db_dir` are intentionally not overridable via env vars in Docker — the volume mounts own those paths. Set them in `config.yaml` for bare-metal deployments.
 
 ---
 

@@ -98,11 +98,6 @@ class TestLoadSettings:
         settings = load_settings(sample_config_yaml)
         assert settings.interval == 300
 
-    def test_env_var_overrides_output_dir(self, sample_config_yaml, monkeypatch, tmp_path):
-        monkeypatch.setenv("REDDIT_FEEDS_OUTPUT_DIR", str(tmp_path / "feeds"))
-        settings = load_settings(sample_config_yaml)
-        assert settings.output_dir == tmp_path / "feeds"
-
     def test_env_var_overrides_log_level(self, sample_config_yaml, monkeypatch):
         monkeypatch.setenv("REDDIT_FEEDS_LOG_LEVEL", "DEBUG")
         settings = load_settings(sample_config_yaml)
@@ -114,9 +109,3 @@ class TestLoadSettings:
         with pytest.raises(ValidationError):
             load_settings(config)
 
-    def test_env_var_overrides_db_dir(self, tmp_path, monkeypatch):
-        config = tmp_path / "config.yaml"
-        config.write_text("feeds: []\ninterval: 300\n")
-        monkeypatch.setenv("REDDIT_FEEDS_DB_DIR", str(tmp_path / "mydb"))
-        settings = load_settings(config)
-        assert settings.db_dir == Path(tmp_path / "mydb")

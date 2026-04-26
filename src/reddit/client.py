@@ -11,6 +11,7 @@ USER_AGENT = "reddit-feeds/0.1"
 TIMEOUT = 15.0
 _MAX_RETRIES = 2
 _RETRY_BASE_DELAY = 2.0
+_HTTP_TOO_MANY_REQUESTS = 429
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +52,13 @@ async def fetch_posts(url: str, limit: int, client: httpx.AsyncClient) -> list[R
             response.elapsed.total_seconds(),
         )
 
-        if response.status_code == 429 and attempt < _MAX_RETRIES:
+        if response.status_code == _HTTP_TOO_MANY_REQUESTS and attempt < _MAX_RETRIES:
             retry_after = response.headers.get("Retry-After")
             delay = float(retry_after) if retry_after else _RETRY_BASE_DELAY * (2**attempt)
-            logger.warning("Rate limited by Reddit (attempt %d/%d), retrying in %.0fs", attempt + 1, _MAX_RETRIES + 1, delay)
+            logger.warning(
+                "Rate limited by Reddit (attempt %d/%d), retrying in %.0fs",
+                attempt + 1, _MAX_RETRIES + 1, delay,
+            )
             await asyncio.sleep(delay)
             continue
 
@@ -64,4 +68,5 @@ async def fetch_posts(url: str, limit: int, client: httpx.AsyncClient) -> list[R
         logger.info("Fetched %d post(s) from %s", len(posts), url)
         return posts
 
-    raise RuntimeError("fetch_posts: unreachable")  # pragma: no cover
+    msg = "fetch_posts: unreachable"  # pragma: no cover
+    raise RuntimeError(msg)  # pragma: no cover

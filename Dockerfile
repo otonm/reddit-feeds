@@ -28,7 +28,7 @@ COPY --from=builder /app/src /app/src
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-VOLUME ["/app/output"]
+VOLUME ["/app/output", "/app/db"]
 
 # stat -c %Y is busybox-compatible; sentinel is touched by run_once() after each cycle
 HEALTHCHECK --interval=2m --timeout=10s --start-period=2m --retries=3 \
