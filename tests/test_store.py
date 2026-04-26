@@ -1,7 +1,5 @@
 """Tests for the store module (StoredItem, SeenStore, FeedStore)."""
 
-
-
 from store.feed_store import FeedStore
 from store.models import StoredItem
 from store.seen_store import SeenStore

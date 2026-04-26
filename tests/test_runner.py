@@ -113,7 +113,10 @@ class TestProcessFeed:
 
         with (
             patch("runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/media1.jpg", "https://i.redd.it/media2.jpg"])),
+            patch(
+                "runner.extract_media_urls_async",
+                AsyncMock(return_value=["https://i.redd.it/media1.jpg", "https://i.redd.it/media2.jpg"]),
+            ),
             patch("runner.write_feed", side_effect=mock_write),
         ):
             async with httpx.AsyncClient() as client:
@@ -135,7 +138,10 @@ class TestProcessFeed:
 
         with (
             patch("runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/media1.jpg", "https://i.redd.it/media2.jpg"])),
+            patch(
+                "runner.extract_media_urls_async",
+                AsyncMock(return_value=["https://i.redd.it/media1.jpg", "https://i.redd.it/media2.jpg"]),
+            ),
             patch("runner.write_feed", side_effect=mock_write),
         ):
             async with httpx.AsyncClient() as client:

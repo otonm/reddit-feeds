@@ -90,13 +90,15 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
             seen.add(post.url)
             continue
 
-        new_items.append(StoredItem(
-            id=post.id,
-            title=post.title,
-            permalink=post.permalink,
-            created_utc=post.created_utc,
-            media_urls=new_urls,
-        ))
+        new_items.append(
+            StoredItem(
+                id=post.id,
+                title=post.title,
+                permalink=post.permalink,
+                created_utc=post.created_utc,
+                media_urls=new_urls,
+            )
+        )
         seen.add(post.url)
         seen.add_many(new_urls)
         logger.debug("[%s] Post %s: %d new media URL(s)", feed.name, post.id, len(new_urls))

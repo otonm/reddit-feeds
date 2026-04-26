@@ -128,4 +128,3 @@ class TestLoadSettings:
         config.write_text("feeds: []\n")
         settings = load_settings(config)
         assert settings.base_url is None
-

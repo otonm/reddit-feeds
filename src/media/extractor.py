@@ -21,10 +21,19 @@ _GALLERY_DL_CONFIG: dict[str, bool] = {
 # gallery-dl's extractor registry initialization is not thread-safe; serialize all find() calls.
 _gallery_dl_lock = threading.Lock()
 
-_DIRECT_MEDIA_EXTENSIONS = frozenset({
-    ".jpg", ".jpeg", ".png", ".gif", ".gifv", ".webp",
-    ".mp4", ".webm", ".mov",
-})
+_DIRECT_MEDIA_EXTENSIONS = frozenset(
+    {
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".gifv",
+        ".webp",
+        ".mp4",
+        ".webm",
+        ".mov",
+    }
+)
 
 
 def _is_direct_media_url(url: str) -> bool:

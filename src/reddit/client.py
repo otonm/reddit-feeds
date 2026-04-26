@@ -57,7 +57,9 @@ async def fetch_posts(url: str, limit: int, client: httpx.AsyncClient) -> list[R
             delay = float(retry_after) if retry_after else _RETRY_BASE_DELAY * (2**attempt)
             logger.warning(
                 "Rate limited by Reddit (attempt %d/%d), retrying in %.0fs",
-                attempt + 1, _MAX_RETRIES + 1, delay,
+                attempt + 1,
+                _MAX_RETRIES + 1,
+                delay,
             )
             await asyncio.sleep(delay)
             continue
