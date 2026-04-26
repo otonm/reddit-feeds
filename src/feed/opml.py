@@ -27,7 +27,9 @@ def build_opml(feeds: list[FeedConfig], base_url: str) -> str:
 
     body = ET.SubElement(root, "body")
     for feed in feeds:
-        ET.SubElement(body, "outline",
+        ET.SubElement(
+            body,
+            "outline",
             type="rss",
             text=feed.name,
             title=f"r/{feed.name}",

@@ -1,7 +1,6 @@
 """Tests for OPML feed index builder and writer."""
 
 import xml.etree.ElementTree as ET
-from pathlib import Path
 
 from config.models import FeedConfig
 from feed.opml import build_opml, write_opml
