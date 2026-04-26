@@ -7,7 +7,7 @@ from slugify import slugify
 
 from config.models import FeedConfig, Settings
 from reddit.models import RedditPost
-from runner import process_feed, run_once
+from runner import FeedResult, process_feed, run_once
 from store.feed_store import FeedStore
 from store.models import StoredItem
 from store.seen_store import SeenStore
@@ -54,9 +54,12 @@ class TestProcessFeed:
             patch("runner.extract_media_urls_async", AsyncMock(return_value=["https://i.redd.it/abc.jpg"])),
         ):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client, seen)
+                result = await process_feed(config, settings, client, seen)
 
         assert (settings.output_dir / "python.xml").exists()
+        assert result.name == "python"
+        assert result.new_item_count == 1
+        assert result.failure is None
 
     async def test_process_feed_skips_posts_with_no_media(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
@@ -191,7 +194,10 @@ class TestProcessFeed:
 
         with patch("runner.fetch_posts", AsyncMock(side_effect=httpx.HTTPError("network error"))):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client, seen)  # must not raise
+                result = await process_feed(config, settings, client, seen)
+
+        assert result.name == "python"
+        assert result.failure == "fetch error"
 
     async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
@@ -205,7 +211,10 @@ class TestProcessFeed:
             patch("runner.write_feed", AsyncMock(side_effect=OSError("disk full"))),
         ):
             async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client, seen)  # must not raise
+                result = await process_feed(config, settings, client, seen)
+
+        assert result.failure == "write error"
+        assert result.new_item_count == 1
 
 
 class TestCleanupRemovedFeeds:
@@ -358,3 +367,45 @@ class TestRunOnce:
             patch("runner.write_opml", AsyncMock(side_effect=OSError("disk full"))),
         ):
             await run_once(settings)  # must not raise
+
+    async def test_run_once_returns_list_of_feed_results(self, tmp_path):
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [feed1])
+
+        async def mock_process_feed(feed, s, client, seen):
+            return FeedResult(name=feed.name, new_item_count=2)
+
+        with patch("runner.process_feed", side_effect=mock_process_feed):
+            results = await run_once(settings)
+
+        assert isinstance(results, list)
+        assert len(results) == 1
+        assert isinstance(results[0], FeedResult)
+        assert results[0].name == "python"
+
+    async def test_run_once_logs_per_feed_summary(self, tmp_path, caplog):
+        import logging
+
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [feed1, feed2])
+
+        results = [
+            FeedResult(name="python", new_item_count=3),
+            FeedResult(name="rust", failure="fetch error"),
+        ]
+        results_iter = iter(results)
+
+        async def mock_process_feed(feed, s, client, seen):
+            return next(results_iter)
+
+        with caplog.at_level(logging.INFO, logger="runner"):
+            with patch("runner.process_feed", side_effect=mock_process_feed):
+                await run_once(settings)
+
+        messages = [r.message for r in caplog.records if r.name == "runner"]
+        assert any("[python] 3 new item(s)" in m for m in messages)
+        assert any("[rust] FAILED (fetch error)" in m for m in messages)
+        assert any(
+            "Run complete:" in m and "2 feed(s)" in m and "1 with new items" in m and "1 failed" in m for m in messages
+        )

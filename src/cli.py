@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Annotated
 
@@ -82,6 +83,8 @@ async def _run_daemon(settings: Settings) -> None:
     """Loop forever: run all feeds, sleep interval, repeat."""
     while True:
         await run_once(settings)
+        next_run_at = datetime.now(tz=UTC).astimezone() + timedelta(seconds=settings.interval)
+        logger.info("Next run at %s (in %ds)", next_run_at.strftime("%H:%M:%S"), settings.interval)
         await asyncio.sleep(settings.interval)
 
 

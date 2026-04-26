@@ -2,7 +2,9 @@
 
 import asyncio
 import logging
+import tempfile
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 import aiofiles.os
@@ -22,7 +24,16 @@ from store.seen_store import SeenStore
 logger = logging.getLogger(__name__)
 
 
-async def run_once(settings: Settings) -> None:
+@dataclass
+class FeedResult:
+    """Result of processing a single feed in one run."""
+
+    name: str
+    new_item_count: int = 0
+    failure: str | None = None
+
+
+async def run_once(settings: Settings) -> list[FeedResult]:
     """Fetch and publish all configured feeds concurrently."""
     await _cleanup_removed_feeds(settings)
 
@@ -38,7 +49,14 @@ async def run_once(settings: Settings) -> None:
             if i > 0 and settings.reddit_fetch_gap > 0:
                 await asyncio.sleep(settings.reddit_fetch_gap)
             tasks.append(asyncio.create_task(process_feed(feed, settings, client, seen)))
-        await asyncio.gather(*tasks, return_exceptions=True)
+        gather_results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    results: list[FeedResult] = []
+    for feed, outcome in zip(settings.feeds, gather_results, strict=True):
+        if isinstance(outcome, FeedResult):
+            results.append(outcome)
+        else:
+            results.append(FeedResult(name=feed.name, failure="internal error"))
 
     await seen.save()
 
@@ -48,11 +66,29 @@ async def run_once(settings: Settings) -> None:
         except Exception:
             logger.exception("Failed to write feeds.opml")
 
-    logger.info("Run complete in %.1fs", time.monotonic() - t0)
-    Path("/tmp/reddit-feeds.last_run").touch()  # noqa: S108, ASYNC240
+    elapsed = time.monotonic() - t0
+    new_count = sum(1 for r in results if r.new_item_count > 0)
+    fail_count = sum(1 for r in results if r.failure)
+
+    for r in results:
+        if r.failure:
+            logger.info("[%s] FAILED (%s)", r.name, r.failure)
+        else:
+            logger.info("[%s] %d new item(s)", r.name, r.new_item_count)
+
+    logger.info(
+        "Run complete: %d feed(s) in %.1fs — %d with new items, %d failed",
+        len(results),
+        elapsed,
+        new_count,
+        fail_count,
+    )
+    sentinel = Path(tempfile.gettempdir()) / "reddit-feeds.last_run"
+    await asyncio.get_event_loop().run_in_executor(None, sentinel.touch)
+    return results
 
 
-async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.AsyncClient, seen: SeenStore) -> None:
+async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.AsyncClient, seen: SeenStore) -> FeedResult:
     """Fetch, deduplicate, merge, and write a single feed incrementally."""
     logger.info("[%s] Fetching %d posts from %s", feed.name, feed.fetch_count, feed.url)
     try:
@@ -60,7 +96,7 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
         logger.debug("[%s] Received %d posts from Reddit", feed.name, len(posts))
     except (httpx.HTTPError, KeyError, ValueError):
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)
-        return
+        return FeedResult(name=feed.name, failure="fetch error")
 
     feed_slug = slugify(feed.name)
     feed_store = FeedStore(settings.db_dir, feed_slug)
@@ -111,6 +147,9 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
         logger.info("[%s] Feed written: %d total items", feed.name, len(all_items))
     except Exception:
         logger.exception("[%s] Failed to write feed", feed.name)
+        return FeedResult(name=feed.name, new_item_count=len(new_items), failure="write error")
+
+    return FeedResult(name=feed.name, new_item_count=len(new_items))
 
 
 async def _cleanup_removed_feeds(settings: Settings) -> None:

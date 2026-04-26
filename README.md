@@ -41,12 +41,12 @@ feeds:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `output_dir` | path | `output/` | Directory where RSS `.xml` files are written (web-served) |
-| `db_dir` | path | `db/` | Directory for internal state: global seen-URL set and per-feed item stores. Keep this off the web server. |
+| `output_dir` | path | `output/` | Directory where RSS `.xml` files are written |
+| `db_dir` | path | `db/` | Directory for internal state: global seen-URL set and per-feed item stores. |
 | `interval` | int (seconds) | `900` | Sleep between daemon runs (minimum 300) |
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
-| `reddit_fetch_gap` | float (seconds) | `2.0` | Minimum delay between Reddit API calls across feeds; reduces rate-limit (429) errors |
-| `base_url` | string | `null` | Public base URL used to construct `xmlUrl` in `feeds.opml`; enables OPML generation when set |
+| `reddit_fetch_gap` | float (seconds) | `2.0` | Minimum delay between Reddit API calls across feeds to reduce rate-limit errors |
+| `base_url` | string | `null` | Public base URL used to construct a `feeds.opml` file to help with importing a lot of feeds at once |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
 | `feeds[].url` | string | required | Reddit subreddit `.json` URL |
 | `feeds[].fetch_count` | int | `20` | Posts to fetch per run (1–100) |
@@ -62,8 +62,6 @@ Top-level scalar fields can be overridden without editing `config.yaml`:
 | `REDDIT_FEEDS_FETCH_GAP` | `reddit_fetch_gap` |
 
 Environment variables take precedence over `config.yaml`.
-
-`output_dir` and `db_dir` are intentionally not overridable via env vars in Docker — the volume mounts own those paths. Set them in `config.yaml` for bare-metal deployments.
 
 ---
 
@@ -191,5 +189,3 @@ docker compose -f docker-compose.tsfunnel.yml up -d
 ```
 
 Feeds available at `https://reddit-feeds.<tailnet>.ts.net/earthporn.xml`.
-
-`$${TS_CERT_DOMAIN}` in the Tailscale serve config is a Docker Compose escape that writes `${TS_CERT_DOMAIN}` literally into the mounted file; Tailscale resolves it to your machine's cert domain at runtime.

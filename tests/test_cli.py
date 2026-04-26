@@ -132,3 +132,24 @@ class TestRunDaemon:
                 await _run_daemon(settings)
 
         assert mock_run.call_count == 2
+
+    async def test_run_daemon_logs_next_run(self, tmp_path, caplog):
+        settings = make_settings(tmp_path)
+        call_count = 0
+
+        async def mock_sleep(seconds):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 1:
+                raise asyncio.CancelledError
+
+        with caplog.at_level(logging.INFO, logger="cli"):
+            with (
+                patch("cli.run_once", AsyncMock()),
+                patch("asyncio.sleep", side_effect=mock_sleep),
+            ):
+                with pytest.raises(asyncio.CancelledError):
+                    await _run_daemon(settings)
+
+        messages = [r.message for r in caplog.records if r.name == "cli"]
+        assert any("Next run at" in m and "in 300s" in m for m in messages)
