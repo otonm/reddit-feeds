@@ -69,6 +69,12 @@ class TestBuildFeed:
         parsed = feedparser.parse(xml)
         assert "<video" in parsed.entries[0].summary
 
+    def test_video_tag_has_autoplay_muted(self):
+        posts = [make_stored_item(media_urls=["https://v.redd.it/abc123.mp4"])]
+        xml = build_feed(make_feed_config(), posts)
+        assert "autoplay" in xml
+        assert "muted" in xml
+
     def test_video_enclosure_has_video_mime(self):
         posts = [make_stored_item(media_urls=["https://v.redd.it/abc.mp4"])]
         xml = build_feed(make_feed_config(), posts)

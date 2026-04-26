@@ -20,6 +20,7 @@ def make_settings(tmp_path: Path, feeds: list[FeedConfig] | None = None) -> Sett
         interval=900,
         feeds=feeds or [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)],
         log_level="INFO",
+        reddit_fetch_gap=0.0,
     )
 
 
@@ -319,3 +320,24 @@ class TestRunOnce:
         seen2 = SeenStore(settings.db_dir)
         await seen2.load()
         assert seen2.contains("https://i.redd.it/tracked.jpg")
+
+    async def test_run_once_staggers_feed_fetches(self, tmp_path):
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
+        feed3 = FeedConfig(name="go", url="https://reddit.com/r/golang/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [feed1, feed2, feed3])
+        settings = settings.model_copy(update={"reddit_fetch_gap": 0.1})
+
+        sleep_calls: list[float] = []
+
+        async def tracking_sleep(delay: float) -> None:
+            sleep_calls.append(delay)
+
+        with (
+            patch("runner.asyncio.sleep", side_effect=tracking_sleep),
+            patch("runner.process_feed", new_callable=AsyncMock),
+        ):
+            await run_once(settings)
+
+        assert len(sleep_calls) == 2  # one gap between each of the 3 feeds
+        assert all(d == 0.1 for d in sleep_calls)

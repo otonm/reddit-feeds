@@ -28,6 +28,7 @@ def _apply_env_overrides(raw: dict) -> None:
         ("REDDIT_FEEDS_DB_DIR", "db_dir"),
         ("REDDIT_FEEDS_INTERVAL", "interval"),
         ("REDDIT_FEEDS_LOG_LEVEL", "log_level"),
+        ("REDDIT_FEEDS_FETCH_GAP", "reddit_fetch_gap"),
     ]
     for env_key, field in overrides:
         val = os.getenv(env_key)

@@ -32,10 +32,12 @@ async def run_once(settings: Settings) -> None:
     logger.info("Starting run: %d feed(s): %s", len(settings.feeds), ", ".join(feed_names))
     t0 = time.monotonic()
     async with httpx.AsyncClient() as client:
-        await asyncio.gather(
-            *[process_feed(feed, settings, client, seen) for feed in settings.feeds],
-            return_exceptions=True,
-        )
+        tasks = []
+        for i, feed in enumerate(settings.feeds):
+            if i > 0 and settings.reddit_fetch_gap > 0:
+                await asyncio.sleep(settings.reddit_fetch_gap)
+            tasks.append(asyncio.create_task(process_feed(feed, settings, client, seen)))
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     await seen.save()
     logger.info("Run complete in %.1fs", time.monotonic() - t0)

@@ -1,8 +1,10 @@
+from unittest.mock import AsyncMock, patch
+
 import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from reddit.client import _parse_post, fetch_posts
+from reddit.client import _MAX_RETRIES, _parse_post, fetch_posts
 
 
 class TestParsePost:
@@ -93,11 +95,38 @@ class TestFetchPosts:
         request = httpx_mock.get_requests()[0]
         assert "limit=25" in str(request.url)
 
-    async def test_fetch_posts_raises_on_http_error(self, httpx_mock: HTTPXMock):
+    async def test_fetch_posts_raises_after_retries_exhausted(self, httpx_mock: HTTPXMock):
+        for _ in range(_MAX_RETRIES + 1):
+            httpx_mock.add_response(status_code=429)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            async with httpx.AsyncClient() as client:
+                with pytest.raises(httpx.HTTPStatusError):
+                    await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+
+    async def test_fetch_posts_retries_on_429_then_succeeds(self, httpx_mock: HTTPXMock, minimal_reddit_response):
         httpx_mock.add_response(status_code=429)
-        async with httpx.AsyncClient() as client:
-            with pytest.raises(httpx.HTTPStatusError):
+        httpx_mock.add_response(json=minimal_reddit_response)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            async with httpx.AsyncClient() as client:
+                posts = await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+        assert len(posts) == 1
+
+    async def test_fetch_posts_respects_retry_after_header(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(status_code=429, headers={"Retry-After": "30"})
+        httpx_mock.add_response(json=minimal_reddit_response)
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async with httpx.AsyncClient() as client:
                 await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+        mock_sleep.assert_called_once_with(30.0)
+
+    async def test_fetch_posts_sleep_count_matches_retries(self, httpx_mock: HTTPXMock):
+        for _ in range(_MAX_RETRIES + 1):
+            httpx_mock.add_response(status_code=429)
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async with httpx.AsyncClient() as client:
+                with pytest.raises(httpx.HTTPStatusError):
+                    await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+        assert mock_sleep.call_count == _MAX_RETRIES
 
     async def test_fetch_posts_empty_feed(self, httpx_mock: HTTPXMock):
         httpx_mock.add_response(json={"data": {"children": []}})

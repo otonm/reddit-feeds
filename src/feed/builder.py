@@ -38,7 +38,7 @@ def _build_description(media_urls: list[str]) -> str:
     parts: list[str] = []
     for url in media_urls:
         if _is_video(url):
-            parts.append(f'<video src="{url}" controls style="max-width:100%"></video>')
+            parts.append(f'<video src="{url}" autoplay muted controls style="max-width:100%"></video>')
         else:
             parts.append(f'<img src="{url}" style="max-width:100%">')
     return "".join(parts)
