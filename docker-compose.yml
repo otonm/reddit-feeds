@@ -13,6 +13,7 @@ services:
       - REDDIT_FEEDS_LOG_LEVEL       # optional: overrides log_level
       - REDDIT_FEEDS_OUTPUT_DIR      # optional: overrides output_dir
       - REDDIT_FEEDS_DB_DIR          # optional: overrides db_dir
+      - REDDIT_FEEDS_FETCH_GAP       # optional: seconds between Reddit API calls (default 2.0)
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
       interval: 2m

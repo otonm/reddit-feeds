@@ -45,6 +45,7 @@ feeds:
 | `db_dir` | path | `db/` | Directory for internal state: global seen-URL set and per-feed item stores. Keep this off the web server. |
 | `interval` | int (seconds) | `900` | Sleep between daemon runs (minimum 300) |
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
+| `reddit_fetch_gap` | float (seconds) | `2.0` | Minimum delay between Reddit API calls across feeds; reduces rate-limit (429) errors |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
 | `feeds[].url` | string | required | Reddit subreddit `.json` URL |
 | `feeds[].fetch_count` | int | `20` | Posts to fetch per run (1–100) |
@@ -59,6 +60,7 @@ Top-level scalar fields can be overridden without editing `config.yaml`:
 | `REDDIT_FEEDS_LOG_LEVEL` | `log_level` |
 | `REDDIT_FEEDS_OUTPUT_DIR` | `output_dir` |
 | `REDDIT_FEEDS_DB_DIR` | `db_dir` |
+| `REDDIT_FEEDS_FETCH_GAP` | `reddit_fetch_gap` |
 
 Environment variables take precedence over `config.yaml`.
 
@@ -83,7 +85,7 @@ uv run python src/cli.py [OPTIONS]
 
 Each RSS item contains:
 
-- **`<description>`** — embedded HTML (`<img>` or `<video>` tag) for direct in-reader media display
+- **`<description>`** — embedded HTML for direct in-reader media display: `<img>` for images/GIFs, `<video autoplay muted controls>` for video (clients that render HTML will autoplay silently)
 - **`<enclosure>`** — first media URL as a typed enclosure for podcast-style clients
 - **`<guid>`** — permalink to the Reddit post (used by readers for deduplication, not for navigation)
 - No `<link>` — omitted intentionally so readers render the embedded media rather than opening Reddit
