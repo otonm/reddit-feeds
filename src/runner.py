@@ -11,6 +11,7 @@ from slugify import slugify
 
 from config.models import FeedConfig, Settings
 from feed.builder import build_feed
+from feed.opml import build_opml, write_opml
 from feed.writer import write_feed
 from media.extractor import extract_media_urls_async
 from reddit.client import fetch_posts
@@ -40,6 +41,13 @@ async def run_once(settings: Settings) -> None:
         await asyncio.gather(*tasks, return_exceptions=True)
 
     await seen.save()
+
+    if settings.base_url:
+        try:
+            await write_opml(build_opml(settings.feeds, settings.base_url), settings.output_dir)
+        except Exception:
+            logger.exception("Failed to write feeds.opml")
+
     logger.info("Run complete in %.1fs", time.monotonic() - t0)
     Path("/tmp/reddit-feeds.last_run").touch()  # noqa: S108, ASYNC240
 

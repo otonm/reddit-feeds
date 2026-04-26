@@ -341,3 +341,30 @@ class TestRunOnce:
 
         assert len(sleep_calls) == 2  # one gap between each of the 3 feeds
         assert all(d == 0.1 for d in sleep_calls)
+
+    async def test_run_once_writes_opml_when_base_url_set(self, tmp_path):
+        settings = make_settings(tmp_path)
+        settings = settings.model_copy(update={"base_url": "https://example.com"})
+
+        with patch("runner.process_feed", new_callable=AsyncMock):
+            await run_once(settings)
+
+        assert (settings.output_dir / "feeds.opml").exists()
+
+    async def test_run_once_skips_opml_when_base_url_is_none(self, tmp_path):
+        settings = make_settings(tmp_path)  # base_url=None by default
+
+        with patch("runner.process_feed", new_callable=AsyncMock):
+            await run_once(settings)
+
+        assert not (settings.output_dir / "feeds.opml").exists()
+
+    async def test_run_once_opml_failure_does_not_raise(self, tmp_path):
+        settings = make_settings(tmp_path)
+        settings = settings.model_copy(update={"base_url": "https://example.com"})
+
+        with (
+            patch("runner.process_feed", new_callable=AsyncMock),
+            patch("runner.write_opml", AsyncMock(side_effect=OSError("disk full"))),
+        ):
+            await run_once(settings)  # must not raise
