@@ -80,6 +80,38 @@ class TestSettings:
         s = Settings(base_url="https://example.com")
         assert s.base_url == "https://example.com"
 
+    def test_duplicate_feed_names_raises(self):
+        feeds = [
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json"),
+            FeedConfig(name="python", url="https://reddit.com/r/rust/.json"),
+        ]
+        with pytest.raises(ValidationError, match="duplicate feed names: python"):
+            Settings(feeds=feeds)
+
+    def test_duplicate_feed_urls_raises(self):
+        feeds = [
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json"),
+            FeedConfig(name="python2", url="https://reddit.com/r/python/.json"),
+        ]
+        with pytest.raises(ValidationError, match="duplicate feed URLs"):
+            Settings(feeds=feeds)
+
+    def test_duplicate_name_and_url_both_reported(self):
+        feeds = [
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json"),
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json"),
+        ]
+        with pytest.raises(ValidationError, match="duplicate feed names"):
+            Settings(feeds=feeds)
+
+    def test_unique_feeds_accepted(self):
+        feeds = [
+            FeedConfig(name="python", url="https://reddit.com/r/python/.json"),
+            FeedConfig(name="rust", url="https://reddit.com/r/rust/.json"),
+        ]
+        s = Settings(feeds=feeds)
+        assert len(s.feeds) == 2
+
 
 class TestLoadSettings:
     def test_load_valid_config(self, sample_config_yaml):

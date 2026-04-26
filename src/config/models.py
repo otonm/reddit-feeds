@@ -1,5 +1,6 @@
 """Pydantic models for application configuration."""
 
+from collections import Counter
 from pathlib import Path
 
 from pydantic import BaseModel, field_validator
@@ -35,6 +36,22 @@ class Settings(BaseModel):
     log_level: str = "INFO"
     reddit_fetch_gap: float = 2.0
     base_url: str | None = None
+
+    @field_validator("feeds")
+    @classmethod
+    def validate_unique_feeds(cls, feeds: list[FeedConfig]) -> list[FeedConfig]:
+        """Reject configs with duplicate feed names or URLs."""
+        dup_names = sorted(n for n, c in Counter(f.name for f in feeds).items() if c > 1)
+        dup_urls = sorted(u for u, c in Counter(f.url for f in feeds).items() if c > 1)
+        errors = []
+        if dup_names:
+            errors.append(f"duplicate feed names: {', '.join(dup_names)}")
+        if dup_urls:
+            errors.append(f"duplicate feed URLs: {', '.join(dup_urls)}")
+        if errors:
+            msg = "; ".join(errors)
+            raise ValueError(msg)
+        return feeds
 
     @field_validator("interval")
     @classmethod
