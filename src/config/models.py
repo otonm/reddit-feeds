@@ -34,6 +34,7 @@ class Settings(BaseModel):
     feeds: list[FeedConfig] = []
     log_level: str = "INFO"
     reddit_fetch_gap: float = 2.0
+    base_url: str | None = None
 
     @field_validator("interval")
     @classmethod

@@ -72,6 +72,14 @@ class TestSettings:
         s = Settings(db_dir=Path("/data/db"))
         assert s.db_dir == Path("/data/db")
 
+    def test_base_url_default_is_none(self):
+        s = Settings()
+        assert s.base_url is None
+
+    def test_base_url_accepts_string(self):
+        s = Settings(base_url="https://example.com")
+        assert s.base_url == "https://example.com"
+
 
 class TestLoadSettings:
     def test_load_valid_config(self, sample_config_yaml):
