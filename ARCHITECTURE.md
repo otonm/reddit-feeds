@@ -37,6 +37,7 @@ Posts with no resolvable media are silently skipped. Posts whose `post.url` is a
 | `src/store/feed_store.py` | `FeedStore` — per-feed ordered list of `StoredItem` backed by `{db_dir}/{slug}.json`; loaded at the start of each feed cycle and saved after new items are appended |
 | `src/feed/builder.py` | Produces RSS 2.0 XML from a `list[StoredItem]`; images use `<img>`, videos use `<video autoplay muted controls>`; sets a first-media `<enclosure>`; no `<link>` — omitting it prevents RSS readers from opening Reddit instead of rendering the embedded media; item identity uses `<guid>` (permalink) |
 | `src/feed/writer.py` | Async file write via aiofiles; filename is a URL-safe slug of the feed name (`EarthPorn` → `earthporn.xml`) |
+| `src/feed/opml.py` | Builds OPML 2.0 XML index from all configured feeds (`build_opml`) and writes `feeds.opml` to `output_dir` (`write_opml`); only called when `base_url` is set |
 | `src/runner.py` | Orchestrates one full cycle: cleans up orphaned files for removed feeds, loads `SeenStore`, launches feeds with `reddit_fetch_gap` stagger between Reddit calls, saves `SeenStore`, touches `/tmp/reddit-feeds.last_run` |
 | `src/cli.py` | Typer CLI; one-shot and daemon mode; configures logging |
 | `src/config/` | Pydantic models + YAML loader; env var overrides for `interval`, `log_level`, and `reddit_fetch_gap`; `output_dir` and `db_dir` are config-file-only (env overrides removed to prevent silently bypassing Docker volume mounts) |
