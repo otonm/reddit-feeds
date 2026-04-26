@@ -39,24 +39,22 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "BLE001",
-    "COM812",
-    "D104",
-    "D107",
-    "D203",
-    "D213",
-    "EM102",
-    "ERA001",
-    "FBT002",
-    "G004",
-    "PLR0913",
-    "T201",
-    "TRY003",
-    "TRY400",
+    "COM812",  # missing trailing comma — conflicts with ruff formatter's own comma handling
+    "D104",    # missing docstring in public package __init__.py — not required for this project
+    "D107",    # missing docstring in __init__ — data classes and simple constructors don't need them
+    "D203",    # one blank line before class docstring — conflicts with D211 (no blank line), using D211
+    "D213",    # multi-line docstring summary on second line — conflicts with D212 (first line), using D212
+    "EM102",   # f-string in exception message — acceptable; avoids a separate variable just for the message
+    "ERA001",  # commented-out code — too noisy during active development
+    "G004",    # f-string in logging call — acceptable; we prefer readability over lazy % formatting
+    "PLR0913", # too many arguments (>5) — unavoidable in some constructors and async gather calls
+    "T201",    # print() detected — we use logger, but some CLI output via print is intentional
+    "TRY400",  # use logging.exception instead of logging.error in except block — error is intentional here
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "src/config/loader.py" = ["TC003", "TC001"]
+"src/media/extractor.py" = ["BLE001"]  # gallery-dl FFI — any exception type possible
 "tests/**/*.py" = ["S101", "ANN", "D100", "D101", "D102", "D103", "D400", "D403", "D415", "INP001", "SIM117", "S314", "SLF001", "PLR2004", "ARG001", "PLC0415", "EM101"]
 
 [dependency-groups]

@@ -189,26 +189,9 @@ class TestProcessFeed:
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
 
-        with patch("runner.fetch_posts", AsyncMock(side_effect=Exception("network error"))):
+        with patch("runner.fetch_posts", AsyncMock(side_effect=httpx.HTTPError("network error"))):
             async with httpx.AsyncClient() as client:
                 await process_feed(config, settings, client, seen)  # must not raise
-
-    async def test_process_feed_extraction_failure_skips_post(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
-        settings = make_settings(tmp_path, [config])
-        seen = make_seen_store(tmp_path)
-        post = make_reddit_post()
-
-        with (
-            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
-            patch("runner.extract_media_urls_async", AsyncMock(side_effect=Exception("gallery-dl broke"))),
-            patch("runner.write_feed", AsyncMock()) as mock_write,
-        ):
-            async with httpx.AsyncClient() as client:
-                await process_feed(config, settings, client, seen)
-
-        xml_arg = mock_write.call_args[0][0]
-        assert len(feedparser.parse(xml_arg).entries) == 0
 
     async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
@@ -305,7 +288,8 @@ class TestRunOnce:
         async def mock_process_feed(feed, s, client, seen):
             processed.append(feed.name)
             if feed.name == "python":
-                raise RuntimeError("python feed exploded")
+                msg = "python feed exploded"
+                raise RuntimeError(msg)
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
             await run_once(settings)  # must not raise

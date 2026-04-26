@@ -58,7 +58,7 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
     try:
         posts = await fetch_posts(feed.url, feed.fetch_count, client)
         logger.debug("[%s] Received %d posts from Reddit", feed.name, len(posts))
-    except Exception:
+    except (httpx.HTTPError, KeyError, ValueError):
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)
         return
 
@@ -72,11 +72,7 @@ async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.Async
             logger.debug("[%s] Skipping post %s: post.url already seen", feed.name, post.id)
             continue
 
-        try:
-            urls = await extract_media_urls_async(post)
-        except Exception:
-            logger.warning("[%s] Extraction failed for post %s", feed.name, post.id, exc_info=True)
-            continue
+        urls = await extract_media_urls_async(post)
 
         if not urls:
             logger.debug("[%s] Skipping post %s: no media", feed.name, post.id)
