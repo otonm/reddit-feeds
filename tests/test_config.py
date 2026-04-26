@@ -117,3 +117,15 @@ class TestLoadSettings:
         with pytest.raises(ValidationError):
             load_settings(config)
 
+    def test_base_url_loaded_from_yaml(self, tmp_path):
+        config = tmp_path / "config.yaml"
+        config.write_text("base_url: https://example.ts.net\nfeeds: []\n")
+        settings = load_settings(config)
+        assert settings.base_url == "https://example.ts.net"
+
+    def test_base_url_defaults_to_none_when_absent(self, tmp_path):
+        config = tmp_path / "config.yaml"
+        config.write_text("feeds: []\n")
+        settings = load_settings(config)
+        assert settings.base_url is None
+
