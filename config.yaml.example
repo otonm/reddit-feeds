@@ -3,7 +3,13 @@
 
 output_dir: output/  # Output directory for web-served RSS files (default: output/)
 db_dir: db/          # Internal database directory, keep this off the web (default: db/)
-# base_url: https://your-hostname.ts.net  # optional: enables feeds.opml generation
+
+# OPML generation (optional)
+# Set base_url to your public hostname to enable feeds.opml generation.
+# On every run, a feeds.opml file is written to output_dir with an <outline> entry
+# for each configured feed. Import it into your RSS reader to subscribe to all feeds
+# in one click instead of adding each URL manually.
+# base_url: https://your-hostname.ts.net
 
 feeds:
   # Example feed with all options specified
