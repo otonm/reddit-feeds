@@ -51,7 +51,7 @@ services:
 configs:
   feeds-config:
     content: |
-      # base_url: https://reddit-feeds.<tailnet>.ts.net  # enables feeds.opml generation
+      # base_url: https://reddit-feeds.<tailnet>.ts.net/feeds  # enables feeds.opml generation
       feeds:
         - name: EarthPorn
           url: https://www.reddit.com/r/EarthPorn/.json
@@ -66,7 +66,7 @@ configs:
         "TCP": { "443": { "HTTPS": true } },
         "Web": {
           "$${TS_CERT_DOMAIN}:443": {
-            "Handlers": { "/": { "Path": "/feeds/" } }
+            "Handlers": { "/feeds/": { "Path": "/feeds/" } }
           }
         },
         "AllowFunnel": { "$${TS_CERT_DOMAIN}:443": true }
