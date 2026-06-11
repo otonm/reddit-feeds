@@ -2,11 +2,14 @@
 
 import asyncio
 import logging
-from urllib.parse import urlparse, urlunparse
+import re
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
+from urllib.parse import urlparse
 
+import feedparser
 import httpx
 
-from reddit.auth import TokenProvider
 from reddit.models import RedditPost
 
 USER_AGENT = "python:reddit-feeds:0.1.0 (by /u/reddit-feeds-bot)"
@@ -15,9 +18,11 @@ _MAX_RETRIES = 2
 _RETRY_BASE_DELAY = 2.0
 _HTTP_TOO_MANY_REQUESTS = 429
 _HTTP_FORBIDDEN = 403
-_HTTP_UNAUTHORIZED = 401
-_REDDIT_HOST = "www.reddit.com"
-_OAUTH_REDDIT_HOST = "oauth.reddit.com"
+
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+_VIDEO_EXTS = (".mp4", ".webm", ".mov")
+
+_LINK_HREF_RE = re.compile(r'href="([^"]+)"\s*>\s*\[link\]')
 
 
 def _user_agent() -> str:
@@ -29,65 +34,122 @@ def _user_agent() -> str:
     return USER_AGENT
 
 
-def _parse_post(data: dict) -> RedditPost:
-    """Parse a Reddit post dict from the JSON API into a RedditPost."""
-    post = RedditPost(
-        id=data["id"],
-        title=data["title"],
-        author=data.get("author") or "[deleted]",
-        permalink=f"https://reddit.com{data['permalink']}",
-        url=data["url"],
-        created_utc=data["created_utc"],
-        post_hint=data.get("post_hint"),
-        is_gallery=bool(data.get("is_gallery", False)),
-        selftext_html=data.get("selftext_html"),
-    )
-    logger.debug("Parsed post %s: %r (hint=%s)", post.id, post.title[:60], post.post_hint)
-    return post
-
-
-def _to_oauth_url(url: str) -> str:
-    """Rewrite www.reddit.com -> oauth.reddit.com for authenticated requests.
-
-    Authenticated Reddit requests must hit oauth.reddit.com per the OAuth2 spec.
-    Other hosts (e.g. old.reddit.com) are passed through unchanged.
-    """
+def _parse_post_hint(url: str) -> str:
+    """Infer post_hint from the post's direct media URL (since RSS omits this field)."""
+    if not url:
+        return "link"
     parsed = urlparse(url)
-    if parsed.netloc == _REDDIT_HOST:
-        return urlunparse(parsed._replace(netloc=_OAUTH_REDDIT_HOST))
-    return url
+    host = parsed.netloc
+    path = parsed.path
+    if host == "v.redd.it":
+        return "hosted:video"
+    if host == "i.redd.it":
+        return "image"
+    if "/gallery" in path:
+        return "image"
+    if host.endswith("reddit.com") and "/comments/" in path:
+        return "link"
+    return _hint_by_extension(path)
+
+
+_IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+_VIDEO_EXTS = (".mp4", ".webm", ".mov")
+
+
+def _hint_by_extension(path: str) -> str:
+    """Return post_hint inferred from a URL's file extension."""
+    lowered = path.lower()
+    if lowered.endswith(_IMAGE_EXTS):
+        return "image"
+    if lowered.endswith(_VIDEO_EXTS):
+        return "rich:video"
+    return "link"
+
+
+def _is_gallery_url(permalink: str, content_url: str) -> bool:
+    """Infer whether a post is a gallery (Reddit's multi-image posts)."""
+    return "/gallery" in permalink or "/gallery" in content_url
+
+
+def _extract_link_url(content_value: str) -> str:
+    """Extract the [link] href from a Reddit RSS entry's HTML content.
+
+    The RSS content has the form:
+        <a href="https://i.redd.it/foo.jpg">[link]</a>
+    or for videos:
+        <a href="https://v.redd.it/xxx">[link]</a>
+    or for galleries:
+        <a href="https://www.reddit.com/r/X/comments/yyy/gallery">[link]</a>
+    """
+    if not content_value:
+        return ""
+    unescaped = content_value.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&").replace("&quot;", '"')
+    match = _LINK_HREF_RE.search(unescaped)
+    return match.group(1) if match else ""
+
+
+def _parse_entry(entry: dict) -> RedditPost:
+    """Parse a single feedparser entry into a RedditPost.
+
+    Mirrors the contract of the old JSON-based _parse_post, but the inputs are
+    Atom 1.0 fields (id, title, author, link, published, content) instead of
+    Reddit's JSON shape.
+    """
+    entry_id = entry.get("id", "").removeprefix("t3_")
+    author = entry.get("author", "").removeprefix("/u/")
+    permalink = entry.get("link", "")
+    published = entry.get("published", "")
+    try:
+        # Reddit RSS serves ISO 8601 (e.g. "2024-11-14T22:13:46+00:00"); feedparser
+        # also normalizes some entries to RFC 2822. Try ISO first, fall back.
+        try:
+            created_utc = datetime.fromisoformat(published).astimezone(UTC).timestamp()
+        except ValueError:
+            created_utc = parsedate_to_datetime(published).astimezone(UTC).timestamp()
+    except (TypeError, ValueError):
+        created_utc = 0.0
+    content_value = ""
+    if entry.get("content"):
+        content_value = entry["content"][0].get("value", "")
+    elif entry.get("summary"):
+        content_value = entry["summary"]
+    url = _extract_link_url(content_value)
+    return RedditPost(
+        id=entry_id,
+        title=entry.get("title", ""),
+        author=author or "[deleted]",
+        permalink=permalink,
+        url=url,
+        created_utc=created_utc,
+        post_hint=_parse_post_hint(url),
+        is_gallery=_is_gallery_url(permalink, url),
+    )
 
 
 async def fetch_posts(
     url: str,
     limit: int,
     client: httpx.AsyncClient,
-    token_provider: TokenProvider | None = None,
 ) -> list[RedditPost]:
-    """Fetch posts from a Reddit JSON feed URL, retrying on 429/403/401."""
-    sep = "&" if "?" in url else "?"
-    request_url = f"{url}{sep}limit={limit}"
-    if token_provider is not None:
-        request_url = _to_oauth_url(request_url)
+    """Fetch posts from a Reddit subreddit RSS feed, retrying on 429/403.
+
+    The `limit` parameter is accepted for API compatibility but Reddit's RSS
+    endpoint doesn't honour it — it returns the most recent ~25 entries.
+    Callers that need fewer entries slice the result themselves.
+    """
+    del limit  # Reddit's RSS endpoint ignores count; see docstring.
 
     for attempt in range(_MAX_RETRIES + 1):
-        logger.debug("GET %s (attempt %d/%d)", request_url, attempt + 1, _MAX_RETRIES + 1)
+        logger.debug("GET %s (attempt %d/%d)", url, attempt + 1, _MAX_RETRIES + 1)
         headers: dict[str, str] = {"User-Agent": _user_agent()}
-        if token_provider is not None:
-            headers["Authorization"] = f"Bearer {await token_provider.get_token()}"
 
-        response = await client.get(request_url, headers=headers, timeout=TIMEOUT)
+        response = await client.get(url, headers=headers, timeout=TIMEOUT)
         logger.debug(
             "Response %d from %s in %.2fs",
             response.status_code,
             url,
             response.elapsed.total_seconds(),
         )
-
-        if response.status_code == _HTTP_UNAUTHORIZED and token_provider is not None and attempt < _MAX_RETRIES:
-            logger.warning("Reddit returned 401 (stale token?), invalidating and retrying")
-            token_provider.invalidate()
-            continue
 
         if response.status_code in (_HTTP_TOO_MANY_REQUESTS, _HTTP_FORBIDDEN) and attempt < _MAX_RETRIES:
             retry_after = response.headers.get("Retry-After")
@@ -103,8 +165,8 @@ async def fetch_posts(
             continue
 
         response.raise_for_status()
-        children = response.json()["data"]["children"]
-        posts = [_parse_post(child["data"]) for child in children]
+        parsed = feedparser.parse(response.text)
+        posts = [_parse_entry(entry) for entry in parsed.entries]
         logger.info("Fetched %d post(s) from %s", len(posts), url)
         return posts
 

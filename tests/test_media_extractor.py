@@ -55,16 +55,18 @@ class TestExtractMediaUrls:
         post = make_post(url="https://imgur.com/abc123", post_hint="image")
         mock_extractor = make_mock_extractor(["https://i.imgur.com/abc123.jpg"])
 
-        with patch("gallery_dl.extractor.find", return_value=mock_extractor):
+        with patch("gallery_dl.extractor.find", return_value=mock_extractor) as mock_find:
             urls = extract_media_urls(post)
 
         assert urls == ["https://i.imgur.com/abc123.jpg"]
+        mock_find.assert_called_once_with("https://imgur.com/abc123")
 
     def test_gallery_multiple_images(self):
         post = make_post(
-            url="https://www.reddit.com/gallery/abc123",
+            url="https://www.reddit.com/r/test/comments/abc123/kitten_pics/gallery",
+            permalink="https://www.reddit.com/r/test/comments/abc123/kitten_pics/",
             is_gallery=True,
-            post_hint=None,
+            post_hint="image",
         )
         mock_extractor = make_mock_extractor(
             [
@@ -73,10 +75,29 @@ class TestExtractMediaUrls:
             ]
         )
 
-        with patch("gallery_dl.extractor.find", return_value=mock_extractor):
+        with patch("gallery_dl.extractor.find", return_value=mock_extractor) as mock_find:
             urls = extract_media_urls(post)
 
         assert urls == ["https://i.redd.it/img1.jpg", "https://i.redd.it/img2.jpg"]
+        # For a gallery post, gallery-dl is invoked with the post permalink, not the gallery URL,
+        # so it can fetch the post page and resolve all gallery image URLs.
+        called_with = mock_find.call_args.args[0]
+        assert called_with == "https://www.reddit.com/r/test/comments/abc123/kitten_pics/"
+
+    def test_v_redd_it_url_passes_permalink_to_gallery_dl(self):
+        post = make_post(
+            url="https://v.redd.it/vid001",
+            permalink="https://www.reddit.com/r/aww/comments/vid001/cute_dog/",
+            post_hint="hosted:video",
+        )
+        mock_extractor = make_mock_extractor(["https://v.redd.it/vid001/DASH_720.mp4?source=fallback"])
+
+        with patch("gallery_dl.extractor.find", return_value=mock_extractor) as mock_find:
+            urls = extract_media_urls(post)
+
+        assert urls == ["https://v.redd.it/vid001/DASH_720.mp4?source=fallback"]
+        called_with = mock_find.call_args.args[0]
+        assert called_with == "https://www.reddit.com/r/aww/comments/vid001/cute_dog/"
 
     def test_fallback_to_direct_url_when_gallery_dl_returns_none(self):
         """When gallery-dl has no extractor for a URL and post_hint is 'image', use post.url directly."""
@@ -104,7 +125,7 @@ class TestExtractMediaUrls:
         assert urls == []
 
     def test_gallery_dl_exception_returns_empty_list(self):
-        post = make_post(url="https://example.com/video", post_hint=None)
+        post = make_post(url="https://example.com/video", post_hint="link")
 
         with patch("gallery_dl.extractor.find", side_effect=Exception("network error")):
             urls = extract_media_urls(post)

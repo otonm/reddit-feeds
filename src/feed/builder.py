@@ -47,7 +47,7 @@ def _build_description(media_urls: list[str]) -> str:
 def build_feed(feed_config: FeedConfig, items: list[StoredItem]) -> str:
     """Build an RSS 2.0 feed string from a list of StoredItem objects."""
     logger.debug("Building RSS feed '%s' from %d item(s)", feed_config.name, len(items))
-    base_url = feed_config.url.removesuffix(".json")
+    base_url = feed_config.url.removesuffix(".rss")
 
     fg = FeedGenerator()
     fg.id(base_url)

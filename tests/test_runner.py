@@ -18,7 +18,7 @@ def make_settings(tmp_path: Path, feeds: list[FeedConfig] | None = None) -> Sett
         output_dir=tmp_path / "output",
         db_dir=tmp_path / "db",
         interval=900,
-        feeds=feeds or [FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)],
+        feeds=feeds or [FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)],
         log_level="INFO",
         reddit_fetch_gap=0.0,
     )
@@ -44,7 +44,7 @@ def make_seen_store(tmp_path: Path) -> SeenStore:
 
 class TestProcessFeed:
     async def test_process_feed_writes_file(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
         post = make_reddit_post()
@@ -62,7 +62,7 @@ class TestProcessFeed:
         assert result.failure is None
 
     async def test_process_feed_skips_posts_with_no_media(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
         post = make_reddit_post()
@@ -83,7 +83,7 @@ class TestProcessFeed:
         assert written_posts == []
 
     async def test_process_feed_skips_post_whose_url_is_already_seen(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
         post = make_reddit_post(url="https://i.redd.it/abc.jpg")
@@ -101,7 +101,7 @@ class TestProcessFeed:
         mock_extract.assert_not_called()  # fast pre-filter: no extraction for seen posts
 
     async def test_process_feed_skips_when_all_media_urls_already_seen(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
         post = make_reddit_post(url="https://i.redd.it/abc.jpg")
@@ -128,7 +128,7 @@ class TestProcessFeed:
         assert written_posts == []
 
     async def test_process_feed_partial_repost_shows_only_new_media(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
         post = make_reddit_post(url="https://i.redd.it/new_gallery.jpg")
@@ -156,7 +156,7 @@ class TestProcessFeed:
         assert "media1.jpg" not in captured_items[0].get("summary", "")
 
     async def test_process_feed_appends_to_existing_items(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
 
@@ -188,7 +188,7 @@ class TestProcessFeed:
         assert len(written_entries) == 2  # prior + new
 
     async def test_process_feed_fetch_failure_does_not_raise(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
 
@@ -200,7 +200,7 @@ class TestProcessFeed:
         assert result.failure == "fetch error"
 
     async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
         seen = make_seen_store(tmp_path)
         post = make_reddit_post()
@@ -220,7 +220,7 @@ class TestProcessFeed:
 class TestCleanupRemovedFeeds:
     async def test_cleanup_removes_orphaned_xml_and_json(self, tmp_path):
         """Files for feeds no longer in config are deleted on run_once."""
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
 
         # Create orphaned output and db files for a feed that is no longer configured
@@ -248,7 +248,7 @@ class TestCleanupRemovedFeeds:
 
     async def test_cleanup_keeps_configured_feed_files(self, tmp_path):
         """Files for feeds still in config are not deleted."""
-        config = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
 
         output_dir = settings.output_dir
@@ -272,8 +272,8 @@ class TestCleanupRemovedFeeds:
 
 class TestRunOnce:
     async def test_run_once_processes_all_feeds(self, tmp_path):
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
-        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [feed1, feed2])
 
         processed: list[str] = []
@@ -288,8 +288,8 @@ class TestRunOnce:
         assert "rust" in processed
 
     async def test_run_once_one_feed_fails_others_complete(self, tmp_path):
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
-        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [feed1, feed2])
 
         processed: list[str] = []
@@ -321,9 +321,9 @@ class TestRunOnce:
         assert seen2.contains("https://i.redd.it/tracked.jpg")
 
     async def test_run_once_staggers_feed_fetches(self, tmp_path):
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
-        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
-        feed3 = FeedConfig(name="go", url="https://reddit.com/r/golang/.json", fetch_count=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.rss", fetch_count=5)
+        feed3 = FeedConfig(name="go", url="https://reddit.com/r/golang/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [feed1, feed2, feed3])
         settings = settings.model_copy(update={"reddit_fetch_gap": 0.1})
 
@@ -369,7 +369,7 @@ class TestRunOnce:
             await run_once(settings)  # must not raise
 
     async def test_run_once_returns_list_of_feed_results(self, tmp_path):
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [feed1])
 
         async def mock_process_feed(feed, s, client, seen, token_provider=None):
@@ -386,8 +386,8 @@ class TestRunOnce:
     async def test_run_once_logs_per_feed_summary(self, tmp_path, caplog):
         import logging
 
-        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
-        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.json", fetch_count=5)
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [feed1, feed2])
 
         results = [
@@ -409,39 +409,3 @@ class TestRunOnce:
         assert any(
             "Run complete:" in m and "2 feed(s)" in m and "1 with new items" in m and "1 failed" in m for m in messages
         )
-
-
-class TestRunOnceAuth:
-    async def test_passes_token_provider_when_credentials_set(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("REDDIT_CLIENT_ID", "cid")
-        monkeypatch.setenv("REDDIT_CLIENT_SECRET", "csec")
-        config = FeedConfig(name="python", url="https://www.reddit.com/r/python/.json", fetch_count=5)
-        settings = make_settings(tmp_path, [config])
-        settings = settings.model_copy(update={"reddit_client_id": "cid", "reddit_client_secret": "csec"})
-
-        captured: list = []
-
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
-            captured.append(token_provider)
-            return FeedResult(name=feed.name)
-
-        with patch("runner.process_feed", side_effect=mock_process_feed):
-            await run_once(settings)
-
-        assert len(captured) == 1
-        assert captured[0] is not None  # TokenProvider instance
-
-    async def test_omits_token_provider_when_credentials_absent(self, tmp_path):
-        config = FeedConfig(name="python", url="https://www.reddit.com/r/python/.json", fetch_count=5)
-        settings = make_settings(tmp_path, [config])  # credentials default to None
-
-        captured: list = []
-
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
-            captured.append(token_provider)
-            return FeedResult(name=feed.name)
-
-        with patch("runner.process_feed", side_effect=mock_process_feed):
-            await run_once(settings)
-
-        assert captured == [None]

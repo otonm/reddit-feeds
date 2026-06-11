@@ -7,7 +7,7 @@ from feed.opml import build_opml, write_opml
 
 
 def make_feed(name: str = "EarthPorn") -> FeedConfig:
-    return FeedConfig(name=name, url=f"https://reddit.com/r/{name}/.json")
+    return FeedConfig(name=name, url=f"https://reddit.com/r/{name}/.rss")
 
 
 def _parse(xml: str) -> ET.Element:

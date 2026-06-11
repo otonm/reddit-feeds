@@ -25,6 +25,15 @@ class FeedConfig(BaseModel):
             raise ValueError(msg)
         return v
 
+    @field_validator("url")
+    @classmethod
+    def validate_rss_url(cls, v: str) -> str:
+        """Require an `.rss` URL — Reddit's JSON endpoint is being deprecated."""
+        if not v.rstrip("/").endswith(".rss"):
+            msg = f"feed url must end with .rss (JSON endpoint deprecated); got {v!r}"
+            raise ValueError(msg)
+        return v
+
 
 class Settings(BaseModel):
     """Top-level application settings."""
@@ -36,8 +45,6 @@ class Settings(BaseModel):
     log_level: str = "INFO"
     reddit_fetch_gap: float = 2.0
     base_url: str | None = None
-    reddit_client_id: str | None = None
-    reddit_client_secret: str | None = None
 
     @field_validator("feeds")
     @classmethod

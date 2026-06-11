@@ -18,7 +18,7 @@ def make_settings(tmp_path: Path) -> Settings:
     return Settings(
         output_dir=tmp_path,
         interval=300,
-        feeds=[FeedConfig(name="python", url="https://reddit.com/r/python/.json")],
+        feeds=[FeedConfig(name="python", url="https://reddit.com/r/python/.rss")],
         log_level="INFO",
     )
 

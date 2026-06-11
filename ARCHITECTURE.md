@@ -5,22 +5,23 @@
 Each configured feed runs through an async pipeline. Feeds are launched with a configurable gap (`reddit_fetch_gap`, default 2 s) between each Reddit API call to avoid rate-limiting. Once launched, they run concurrently. `SeenStore` is shared across all feeds and loaded/saved once per cycle by `run_once`.
 
 ```
-Reddit JSON API
+Reddit RSS feed
       │
       ▼
- reddit/client.py      — HTTP GET with httpx, parses post list
-      │
-      ▼
+ reddit/client.py      — HTTP GET with httpx, parses Atom 1.0 via feedparser
+       │
+       ▼
  media/extractor.py    — gallery-dl resolves direct media URLs per post
-      │
-      ▼
+       │                (passes the post permalink for v.redd.it / gallery posts
+       │                 so gallery-dl can fetch the post page and resolve them)
+       ▼
  store/seen_store.py   — two-level dedup: post.url pre-filter + per-media-URL filter
  store/feed_store.py   — load existing items, append new ones, persist to db_dir
-      │
-      ▼
+       │
+       ▼
  feed/builder.py       — builds RSS 2.0 XML with <enclosure> + embedded HTML
-      │
-      ▼
+       │
+       ▼
  feed/writer.py        — writes <slug>.xml to output_dir asynchronously
 ```
 
@@ -30,8 +31,8 @@ Posts with no resolvable media are silently skipped. Posts whose `post.url` is a
 
 | Module | Role |
 |--------|------|
-| `src/reddit/client.py` | Fetches posts from Reddit's public `.json` endpoint using httpx; no auth; retries up to 2× on 429, honouring the `Retry-After` header (falls back to 2 s / 4 s exponential backoff) |
-| `src/media/extractor.py` | Uses gallery-dl (1000+ supported sites) to resolve direct media URLs; runs in a thread pool via `run_in_executor` to avoid blocking the event loop |
+| `src/reddit/client.py` | Fetches posts from Reddit's public `.rss` Atom feed (the JSON endpoint is deprecated — see https://www.reddit.com/r/modnews/comments/1tq9vxo); parses with feedparser; infers `post_hint` and `is_gallery` from URL patterns; retries up to 2× on 429/403, honouring the `Retry-After` header (falls back to 2 s / 4 s exponential backoff) |
+| `src/media/extractor.py` | Uses gallery-dl (1000+ supported sites) to resolve direct media URLs; for v.redd.it and gallery posts, passes the post permalink (not the bare media URL) so gallery-dl can fetch the post page; runs in a thread pool via `run_in_executor` to avoid blocking the event loop |
 | `src/store/models.py` | `StoredItem` dataclass — the persistent feed item representation; serialises to/from JSON |
 | `src/store/seen_store.py` | `SeenStore` — global in-memory `set[str]` of seen `post.url` + media URLs; backed by `{db_dir}/seen.json`; shared across all feeds within a cycle |
 | `src/store/feed_store.py` | `FeedStore` — per-feed ordered list of `StoredItem` backed by `{db_dir}/{slug}.json`; loaded at the start of each feed cycle and saved after new items are appended |
@@ -40,7 +41,7 @@ Posts with no resolvable media are silently skipped. Posts whose `post.url` is a
 | `src/feed/opml.py` | Builds OPML 2.0 XML index from all configured feeds (`build_opml`) and writes `feeds.opml` to `output_dir` (`write_opml`); only called when `base_url` is set |
 | `src/runner.py` | Orchestrates one full cycle: cleans up orphaned files for removed feeds, loads `SeenStore`, launches feeds with `reddit_fetch_gap` stagger between Reddit calls, saves `SeenStore`, touches `/tmp/reddit-feeds.last_run` |
 | `src/cli.py` | Typer CLI; one-shot and daemon mode; configures logging |
-| `src/config/` | Pydantic models + YAML loader; env var overrides for `interval`, `log_level`, and `reddit_fetch_gap`; `output_dir` and `db_dir` are config-file-only (env overrides removed to prevent silently bypassing Docker volume mounts) |
+| `src/config/` | Pydantic models + YAML loader; env var overrides for `interval`, `log_level`, and `reddit_fetch_gap`; `output_dir` and `db_dir` are config-file-only (env overrides removed to prevent silently bypassing Docker volume mounts); `FeedConfig.url` validator requires `.rss` |
 
 ## Docker image
 
@@ -77,8 +78,10 @@ Tests use pytest-asyncio and pytest-httpx; no external services required. All as
 
 | Package | Purpose |
 |---------|---------|
-| `httpx` | Async HTTP client for Reddit JSON API |
-| `gallery-dl` | Media URL extraction (1000+ sites) |
+| `httpx` | Async HTTP client for Reddit RSS |
+| `feedparser` | Atom 1.0 feed parser (Python stdlib `email.utils` handles RFC 2822 dates as a fallback) |
+| `gallery-dl` | Media URL extraction (1000+ sites); moved its canonical repo to https://codeberg.org/mikf/gallery-dl but PyPI distribution is unchanged |
+| `yt-dlp` | Required by gallery-dl for hosted video (v.redd.it) DASH/HLS URL extraction |
 | `feedgen` | RSS 2.0 feed generation |
 | `pyyaml` | Config file parsing (`safe_load` only) |
 | `pydantic` | Config model validation |

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass
 class RedditPost:
-    """A single Reddit post extracted from the JSON feed."""
+    """A single Reddit post extracted from the subreddit RSS feed."""
 
     id: str
     title: str
@@ -13,6 +13,5 @@ class RedditPost:
     permalink: str
     url: str
     created_utc: float
-    post_hint: str | None = None
+    post_hint: str = "link"
     is_gallery: bool = False
-    selftext_html: str | None = None

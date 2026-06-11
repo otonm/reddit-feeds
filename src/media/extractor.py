@@ -44,6 +44,10 @@ def extract_media_urls(post: RedditPost) -> list[str]:
     """Extract direct media URLs from a Reddit post using gallery-dl.
 
     Returns empty list if no media can be extracted. Safe to call from a thread pool.
+
+    For v.redd.it videos and gallery posts, gallery-dl needs the full post
+    permalink (not the bare /v.redd.it/xxx or /gallery URL) so it can fetch
+    the post page and resolve the real media URLs.
     """
     logger.debug("Extracting media from %s (hint=%s)", post.url, post.post_hint)
 
@@ -51,7 +55,8 @@ def extract_media_urls(post: RedditPost) -> list[str]:
         logger.debug("Direct media URL, skipping gallery-dl: %s", post.url)
         return [post.url]
 
-    urls, can_fallback = _try_gallery_dl(post.url)
+    target = post.permalink if post.is_gallery or post.post_hint == "hosted:video" else post.url
+    urls, can_fallback = _try_gallery_dl(target)
 
     if not urls and can_fallback and post.post_hint == "image":
         logger.debug("No gallery-dl match; falling back to direct URL for %s", post.url)

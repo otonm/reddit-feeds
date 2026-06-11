@@ -7,7 +7,7 @@ from store.models import StoredItem
 
 
 def make_feed_config(name: str = "python") -> FeedConfig:
-    return FeedConfig(name=name, url=f"https://reddit.com/r/{name}/.json")
+    return FeedConfig(name=name, url=f"https://reddit.com/r/{name}/.rss")
 
 
 def make_stored_item(**kwargs) -> StoredItem:

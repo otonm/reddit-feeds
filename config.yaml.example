@@ -4,9 +4,9 @@
 output_dir: output/  # Output directory for web-served RSS files (default: output/)
 db_dir: db/          # Internal database directory, keep this off the web (default: db/)
 
-# Optional: Reddit OAuth2 credentials to avoid 403 errors on cloud/datacenter IPs.
-# Register an app at https://www.reddit.com/prefs/apps (type: "script") and set
-# the two REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET env vars. See README for details.
+# IMPORTANT: feed URLs must end with `.rss`. Reddit's public `.json` endpoint
+# has been deprecated (see https://www.reddit.com/r/modnews/comments/1tq9vxo).
+# If you have an existing config with `.json` URLs, change them to `.rss`.
 
 # OPML generation (optional)
 # Set base_url to your public hostname to enable feeds.opml generation.
@@ -18,14 +18,14 @@ db_dir: db/          # Internal database directory, keep this off the web (defau
 feeds:
   # Example feed with all options specified
   - name: EarthPorn
-    url: https://www.reddit.com/r/EarthPorn/.json
+    url: https://www.reddit.com/r/EarthPorn/.rss
     fetch_count: 25      # Posts to fetch per run (default: 20, max: 100)
 
   # Example feed using defaults
   - name: AbandonedPorn
-    url: https://www.reddit.com/r/AbandonedPorn/.json
+    url: https://www.reddit.com/r/AbandonedPorn/.rss
     # fetch_count will use default (20)
 
   # Add more feeds as needed
   # - name: HistoryPorn
-  #   url: https://www.reddit.com/r/HistoryPorn/.json
+  #   url: https://www.reddit.com/r/HistoryPorn/.rss
