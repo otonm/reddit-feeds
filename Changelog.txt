@@ -1,0 +1,102 @@
+Changelog
+=========
+
+All notable changes to Reddit Feeds, newest first.
+
+[7e64fb0] feat: bypass Reddit WAF for v.redd.it and galleries via yt-dlp + session cookie
+  Optional `reddit_session` cookie forwarded to gallery-dl and yt-dlp;
+  hosted:video now resolved via yt-dlp (gallery-dl fallback); large
+  AbortExtraction payload replaced with one-line WARNING.
+
+[0c35611] feat: switch to RSS endpoints; remove OAuth
+  RedditPost parsed from Atom 1.0 via feedparser; .json URLs rejected
+  at config load; REDDIT_CLIENT_ID/SECRET removed; yt-dlp added for
+  v.redd.it DASH/HLS.
+
+[3b40865] feat: support optional Reddit OAuth2 to fix 403 errors
+  App-only client_credentials flow routing to oauth.reddit.com; token
+  cached and refreshed; 403/429 retry backoff.
+
+[f74cea6] Update the funnel to serve feeds through /feeds/ path
+
+[0a5af35] feat: add structured run summary at end of each run
+  FeedResult dataclass; per-feed INFO line plus totals (feeds,
+  duration, new items, failures); daemon mode logs next-run time.
+
+[53a6277] docs: expand opml example in config.yaml.example
+[64b564d] feat: reject duplicate feed names or URLs at config load time
+[e6ac66f] fix: resolve ruff lint errors without broad suppression
+[16bffc7] style: apply ruff formatting to source and test files
+[3647a58] docs: fix base_url description and sync compose example in README
+[0825dc4] docs: document base_url and feeds.opml in README, ARCHITECTURE, compose
+[8e44668] feat: write feeds.opml after each run when base_url is configured
+[a9b08f0] fix: ruff format and remove unused import in opml module
+[2241b84] feat: add OPML feed index builder and writer
+[1e96580] test: add load_settings round-trip tests for base_url
+[0739faf] feat: add base_url setting for OPML feed index generation
+[fa926f7] fix: remove output_dir/db_dir env var overrides; fix Dockerfile VOLUME
+[bf89d1b] docs: document reddit_fetch_gap, 429 retry, and autoplay video
+[8b75114] feat: autoplay muted video, stagger Reddit fetches, retry on 429
+[cfe980e] docs: rewrite documentation for new project architecture; update README
+[7148ee7] fix(tailscale): add TS_STATE_DIR env var and sys_module capability
+[85d73cc] refactor(store): extract shared load_json helper
+[0135c5d] fix: remove <link> from RSS entries to prevent clients navigating away
+[106d65e] Updated paths
+[3b9101c] chore: document REDDIT_FEEDS_DB_DIR env var in docker-compose.yml
+[2c16a87] docs: update README and ARCHITECTURE for incremental feeds and db_dir
+[c4811bf] fix: handle corrupt store files, add db volume mounts, lint cleanup
+[d3ab3ae] fix: lint violations in test_runner, document best-effort cross-feed dedup
+[a8b0fac] feat: incremental feed updates with two-level deduplication and orphan cleanup
+[53ef8c4] refactor: build_feed now accepts StoredItem list, remove MediaPost
+[2f98a89] feat: add store module with SeenStore and FeedStore
+[6299aae] feat: add db_dir setting for internal database directory
+[ec15b74] fix: rename fetch_items to fetch_count in config files and constants
+[1222f05] refactor: rename fetch_items to fetch_count for clarity
+[de69005] Include tests in the deployment
+[ff8d251] test: fix and extend media extractor tests for direct-URL fast path
+[262f516] fix: resolve first-run failures in Alpine LXC container
+[0f7836b] feat: configure feeds inline in docker-compose via configs.content
+[d352aca] chore: remove docs/ from repo and gitignore it
+[83d4e63] chore: remove local dev artifacts from repo, add path-filtered CI
+[1b6e281] docs: refactor Tailscale sidecar to use compose configs, health check, devices
+[bce7f0c] docs: simplify README for end users, extract ARCHITECTURE.md
+[dad0515] fix: add REDDIT_FEEDS_OUTPUT_DIR to compose env, drop SYS_MODULE from sidecar example
+[db52230] docs: add Tailscale container sidecar deployment example
+[daf2da2] docs: replace nginx Tailscale example with direct tailscale funnel command
+[dd17e4c] docs: document REDDIT_FEEDS_* environment variable overrides
+[18be78c] fix: use pass-through env vars in docker-compose (no hardcoded defaults)
+[9cca77b] feat: expose REDDIT_FEEDS_INTERVAL and REDDIT_FEEDS_LOG_LEVEL in docker-compose
+[754b9c5] feat: raise minimum interval from 60s to 300s (5 minutes)
+[8601734] docs: add env-config and Tailscale deployment implementation plan
+[a1bb0ff] docs: fix tailscale funnel command in design spec
+[59e47ca] docs: add env-config and Tailscale deployment design spec
+[ccef479] docs: add README with architecture, config, CLI, Docker and Tailscale Funnel guide
+[b24a80a] feat: add healthcheck to docker-compose.yml
+[ba8288b] fix: track uv.lock and remove it from .gitignore
+[a944f0b] feat: add Docker deployment with GitHub Actions CI
+[3cfcb65] feat: add -d/--debug and -q/--quiet flags, fill all modules with log coverage
+[25e2c5d] test: update imports and patch targets after namespace removal
+[f8e85cd] chore: disable package mode, add pythonpath for tests, update coverage source
+[eee44e3] refactor: flatten src layout, remove reddit_feeds namespace
+[9881817] test: cover runner write-failure, async extractor, builder branch - 100% coverage
+[b772ffb] test: add CLI tests covering all branches of cli.py
+[927143e] chore: add pytest-cov with 100% fail-under threshold
+[b1891df] refactor: add BLE001/FBT002 to ruff ignores, fix S108, remove noqa directives
+[2df32e5] refactor: move gallery-dl imports to module level, extract config dict
+[4e6837b] fix: pre-merge corrections (get_running_loop, interval validation, log, dep cleanup)
+[e3f6382] feat: add typer CLI with run and --daemon mode
+[7f395db] feat: implement async runner with concurrent feed processing
+[1d61902] feat: implement async feed writer
+[f6c1e68] feat: implement feed models and RSS builder
+[281ed6a] feat: implement media extractor with gallery-dl
+[e0af7b7] style: add module docstrings to reddit package
+[a2a24af] feat: implement fetch_posts with httpx
+[d9b19c2] feat: add RedditPost model and _parse_post
+[5ffe9c3] feat: add config loader with YAML parsing and env-var overrides
+[b949653] feat: add config models with fetch_items validation
+[82a949f] feat: scaffold package structure and create conftest
+[9284a6a] fix: correct pyproject.toml syntax, replace feedgenerator with feedgen
+[8ea89b0] chore: ignore .worktrees/ directory
+[eb59a76] Add implementation plan for Reddit Feeds
+[3f38b31] Fix spec ambiguities: fetch_items validation, video tag clarification
+[acf46c1] Add Reddit Feeds design spec
