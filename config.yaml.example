@@ -4,6 +4,10 @@
 output_dir: output/  # Output directory for web-served RSS files (default: output/)
 db_dir: db/          # Internal database directory, keep this off the web (default: db/)
 
+# Optional: Reddit OAuth2 credentials to avoid 403 errors on cloud/datacenter IPs.
+# Register an app at https://www.reddit.com/prefs/apps (type: "script") and set
+# the two REDDIT_CLIENT_ID and REDDIT_CLIENT_SECRET env vars. See README for details.
+
 # OPML generation (optional)
 # Set base_url to your public hostname to enable feeds.opml generation.
 # On every run, a feeds.opml file is written to output_dir with an <outline> entry

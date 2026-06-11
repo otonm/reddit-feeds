@@ -13,6 +13,11 @@ services:
       - REDDIT_FEEDS_INTERVAL=600
       - REDDIT_FEEDS_LOG_LEVEL=INFO
       - REDDIT_FEEDS_FETCH_GAP=2.0
+      # Optional: Reddit OAuth2 credentials (avoids 403 errors on cloud IPs).
+      # Register an app at https://www.reddit.com/prefs/apps (type: "script").
+      # Add the two vars to your .env file alongside TS_AUTHKEY.
+      - REDDIT_CLIENT_ID=${REDDIT_CLIENT_ID:-}
+      - REDDIT_CLIENT_SECRET=${REDDIT_CLIENT_SECRET:-}
     healthcheck:
       test: ["CMD-SHELL", "test -f /tmp/reddit-feeds.last_run && [ $$(( $$(date +%s) - $$(stat -c %Y /tmp/reddit-feeds.last_run) )) -lt 3600 ]"]
       interval: 2m

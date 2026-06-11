@@ -27,6 +27,8 @@ def _apply_env_overrides(raw: dict) -> None:
         ("REDDIT_FEEDS_INTERVAL", "interval"),
         ("REDDIT_FEEDS_LOG_LEVEL", "log_level"),
         ("REDDIT_FEEDS_FETCH_GAP", "reddit_fetch_gap"),
+        ("REDDIT_CLIENT_ID", "reddit_client_id"),
+        ("REDDIT_CLIENT_SECRET", "reddit_client_secret"),
     ]
     for env_key, field in overrides:
         val = os.getenv(env_key)

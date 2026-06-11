@@ -60,8 +60,23 @@ Top-level scalar fields can be overridden without editing `config.yaml`:
 | `REDDIT_FEEDS_INTERVAL` | `interval` |
 | `REDDIT_FEEDS_LOG_LEVEL` | `log_level` |
 | `REDDIT_FEEDS_FETCH_GAP` | `reddit_fetch_gap` |
+| `REDDIT_CLIENT_ID` | `reddit_client_id` |
+| `REDDIT_CLIENT_SECRET` | `reddit_client_secret` |
 
 Environment variables take precedence over `config.yaml`.
+
+### Optional: Reddit API credentials (recommended for cloud deployments)
+
+Reddit's public `www.reddit.com/.json` endpoint returns `403 Blocked` to requests from datacenter IPs, which means feeds running on VPS, Docker hosts, and most cloud providers will fail without authentication. The app works without credentials on residential networks, but is not reliable elsewhere.
+
+To fix this, register an app at <https://www.reddit.com/prefs/apps> and use the `client_credentials` OAuth2 grant (no Reddit user account required):
+
+1. Go to <https://www.reddit.com/prefs/apps> and click **create another app**.
+2. Choose **script** (personal/headless use) or **web app** (server with a redirect URL).
+3. Note the `client_id` (the string under the app name) and `client_secret`.
+4. Set both as environment variables — `REDDIT_CLIENT_ID` and `REDDIT_CLIENT_SECRET` — in your deployment. Never commit them.
+
+When both variables are set, the app acquires a bearer token, sends it on every request, and refreshes it automatically (tokens last 1 hour, refreshed 5 minutes before expiry). Authenticated requests go to `oauth.reddit.com` and have a higher rate limit (100 req/min per OAuth client vs ~10 req/min for unauthenticated).
 
 ---
 

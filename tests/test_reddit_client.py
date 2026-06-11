@@ -4,7 +4,8 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from reddit.client import _MAX_RETRIES, _parse_post, fetch_posts
+from reddit.auth import RedditAuthConfig, TokenProvider
+from reddit.client import _MAX_RETRIES, _parse_post, _user_agent, fetch_posts
 
 
 class TestParsePost:
@@ -85,7 +86,7 @@ class TestFetchPosts:
             await fetch_posts("https://reddit.com/r/python/.json", 5, client)
 
         request = httpx_mock.get_requests()[0]
-        assert request.headers["user-agent"] == "reddit-feeds/0.1"
+        assert request.headers["user-agent"] == _user_agent()
 
     async def test_fetch_posts_appends_limit_param(self, httpx_mock: HTTPXMock, minimal_reddit_response):
         httpx_mock.add_response(json=minimal_reddit_response)
@@ -133,3 +134,99 @@ class TestFetchPosts:
         async with httpx.AsyncClient() as client:
             posts = await fetch_posts("https://reddit.com/r/python/.json", 10, client)
         assert posts == []
+
+
+class TestUserAgent:
+    def test_user_agent_matches_reddit_required_format(self):
+        ua = _user_agent()
+        # Reddit requires: <platform>:<app-id>:<version> (by /u/<username>)
+        assert ":" in ua
+        assert ua.startswith("python:")
+        assert "(by /u/" in ua
+
+
+class TestFetchPostsAuth:
+    async def test_unauthenticated_uses_www_reddit_com(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(json=minimal_reddit_response)
+        async with httpx.AsyncClient() as client:
+            await fetch_posts("https://www.reddit.com/r/python/.json", 10, client)
+        request = httpx_mock.get_requests()[0]
+        assert "www.reddit.com" in str(request.url)
+
+    async def test_authenticated_rewrites_host_to_oauth_reddit(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(json=minimal_reddit_response)
+        async with httpx.AsyncClient() as client:
+            provider = TokenProvider(RedditAuthConfig(client_id="cid", client_secret="sec"), client=client)
+            with patch.object(provider, "get_token", AsyncMock(return_value="bearer-tok")):
+                await fetch_posts("https://www.reddit.com/r/python/.json", 10, client, token_provider=provider)
+        request = httpx_mock.get_requests()[0]
+        assert "oauth.reddit.com" in str(request.url)
+        assert "www.reddit.com" not in str(request.url)
+
+    async def test_authenticated_sends_bearer_header(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(json=minimal_reddit_response)
+        async with httpx.AsyncClient() as client:
+            provider = TokenProvider(RedditAuthConfig(client_id="cid", client_secret="sec"), client=client)
+            with patch.object(provider, "get_token", AsyncMock(return_value="bearer-tok")):
+                await fetch_posts("https://www.reddit.com/r/python/.json", 10, client, token_provider=provider)
+        request = httpx_mock.get_requests()[0]
+        assert request.headers["authorization"] == "Bearer bearer-tok"
+
+    async def test_authenticated_preserves_non_reddit_host(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(json=minimal_reddit_response)
+        async with httpx.AsyncClient() as client:
+            provider = TokenProvider(RedditAuthConfig(client_id="cid", client_secret="sec"), client=client)
+            with patch.object(provider, "get_token", AsyncMock(return_value="bearer-tok")):
+                await fetch_posts("https://old.reddit.com/r/python/.json", 10, client, token_provider=provider)
+        request = httpx_mock.get_requests()[0]
+        assert "old.reddit.com" in str(request.url)
+        assert "oauth.reddit.com" not in str(request.url)
+
+    async def test_401_triggers_invalidate_and_retry(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(status_code=401)
+        httpx_mock.add_response(json=minimal_reddit_response)
+        async with httpx.AsyncClient() as client:
+            provider = TokenProvider(RedditAuthConfig(client_id="cid", client_secret="sec"), client=client)
+            with (
+                patch.object(provider, "get_token", AsyncMock(return_value="bearer-tok")) as mock_get,
+                patch.object(provider, "invalidate") as mock_invalidate,
+            ):
+                posts = await fetch_posts("https://www.reddit.com/r/python/.json", 10, client, token_provider=provider)
+        assert len(posts) == 1
+        mock_invalidate.assert_called_once()
+        assert mock_get.call_count == 2  # once for each attempt after invalidate
+
+
+class TestFetchPosts403Retry:
+    async def test_retries_on_403_then_succeeds(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(status_code=403)
+        httpx_mock.add_response(json=minimal_reddit_response)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            async with httpx.AsyncClient() as client:
+                posts = await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+        assert len(posts) == 1
+
+    async def test_403_respects_retry_after_header(self, httpx_mock: HTTPXMock, minimal_reddit_response):
+        httpx_mock.add_response(status_code=403, headers={"Retry-After": "5"})
+        httpx_mock.add_response(json=minimal_reddit_response)
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async with httpx.AsyncClient() as client:
+                await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+        mock_sleep.assert_called_once_with(5.0)
+
+    async def test_403_raises_after_retries_exhausted(self, httpx_mock: HTTPXMock):
+        for _ in range(_MAX_RETRIES + 1):
+            httpx_mock.add_response(status_code=403)
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            async with httpx.AsyncClient() as client:
+                with pytest.raises(httpx.HTTPStatusError):
+                    await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+
+    async def test_403_sleep_count_matches_retries(self, httpx_mock: HTTPXMock):
+        for _ in range(_MAX_RETRIES + 1):
+            httpx_mock.add_response(status_code=403)
+        with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
+            async with httpx.AsyncClient() as client:
+                with pytest.raises(httpx.HTTPStatusError):
+                    await fetch_posts("https://reddit.com/r/python/.json", 10, client)
+        assert mock_sleep.call_count == _MAX_RETRIES

@@ -16,6 +16,7 @@ from feed.builder import build_feed
 from feed.opml import build_opml, write_opml
 from feed.writer import write_feed
 from media.extractor import extract_media_urls_async
+from reddit.auth import TokenProvider, make_token_provider
 from reddit.client import fetch_posts
 from store.feed_store import FeedStore
 from store.models import StoredItem
@@ -44,11 +45,18 @@ async def run_once(settings: Settings) -> list[FeedResult]:
     logger.info("Starting run: %d feed(s): %s", len(settings.feeds), ", ".join(feed_names))
     t0 = time.monotonic()
     async with httpx.AsyncClient() as client:
+        token_provider = make_token_provider(
+            settings.reddit_client_id,
+            settings.reddit_client_secret,
+            client,
+        )
+        if token_provider is not None:
+            logger.info("Reddit OAuth2 enabled (client_id=%r)", settings.reddit_client_id)
         tasks = []
         for i, feed in enumerate(settings.feeds):
             if i > 0 and settings.reddit_fetch_gap > 0:
                 await asyncio.sleep(settings.reddit_fetch_gap)
-            tasks.append(asyncio.create_task(process_feed(feed, settings, client, seen)))
+            tasks.append(asyncio.create_task(process_feed(feed, settings, client, seen, token_provider)))
         gather_results = await asyncio.gather(*tasks, return_exceptions=True)
 
     results: list[FeedResult] = []
@@ -88,11 +96,17 @@ async def run_once(settings: Settings) -> list[FeedResult]:
     return results
 
 
-async def process_feed(feed: FeedConfig, settings: Settings, client: httpx.AsyncClient, seen: SeenStore) -> FeedResult:
+async def process_feed(
+    feed: FeedConfig,
+    settings: Settings,
+    client: httpx.AsyncClient,
+    seen: SeenStore,
+    token_provider: TokenProvider | None = None,
+) -> FeedResult:
     """Fetch, deduplicate, merge, and write a single feed incrementally."""
     logger.info("[%s] Fetching %d posts from %s", feed.name, feed.fetch_count, feed.url)
     try:
-        posts = await fetch_posts(feed.url, feed.fetch_count, client)
+        posts = await fetch_posts(feed.url, feed.fetch_count, client, token_provider=token_provider)
         logger.debug("[%s] Received %d posts from Reddit", feed.name, len(posts))
     except (httpx.HTTPError, KeyError, ValueError):
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)

@@ -160,3 +160,22 @@ class TestLoadSettings:
         config.write_text("feeds: []\n")
         settings = load_settings(config)
         assert settings.base_url is None
+
+    def test_reddit_credentials_default_to_none(self):
+        s = Settings()
+        assert s.reddit_client_id is None
+        assert s.reddit_client_secret is None
+
+    def test_reddit_credentials_loaded_from_env(self, sample_config_yaml, monkeypatch):
+        monkeypatch.setenv("REDDIT_CLIENT_ID", "my_cid")
+        monkeypatch.setenv("REDDIT_CLIENT_SECRET", "my_csecret")
+        settings = load_settings(sample_config_yaml)
+        assert settings.reddit_client_id == "my_cid"
+        assert settings.reddit_client_secret == "my_csecret"
+
+    def test_reddit_credentials_partial_env_kept_as_none(self, sample_config_yaml, monkeypatch):
+        monkeypatch.delenv("REDDIT_CLIENT_ID", raising=False)
+        monkeypatch.setenv("REDDIT_CLIENT_SECRET", "my_csecret")
+        settings = load_settings(sample_config_yaml)
+        assert settings.reddit_client_id is None
+        assert settings.reddit_client_secret == "my_csecret"

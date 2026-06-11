@@ -236,7 +236,7 @@ class TestCleanupRemovedFeeds:
         seen_json = db_dir / "seen.json"
         seen_json.write_text("[]")
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             pass
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -260,7 +260,7 @@ class TestCleanupRemovedFeeds:
         kept_xml.write_text("<rss/>")
         kept_json.write_text("[]")
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             pass
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -278,7 +278,7 @@ class TestRunOnce:
 
         processed: list[str] = []
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             processed.append(feed.name)
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -294,7 +294,7 @@ class TestRunOnce:
 
         processed: list[str] = []
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             processed.append(feed.name)
             if feed.name == "python":
                 msg = "python feed exploded"
@@ -309,7 +309,7 @@ class TestRunOnce:
     async def test_run_once_saves_seen_store(self, tmp_path):
         settings = make_settings(tmp_path)
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             seen.add("https://i.redd.it/tracked.jpg")
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -372,7 +372,7 @@ class TestRunOnce:
         feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.json", fetch_count=5)
         settings = make_settings(tmp_path, [feed1])
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             return FeedResult(name=feed.name, new_item_count=2)
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -396,7 +396,7 @@ class TestRunOnce:
         ]
         results_iter = iter(results)
 
-        async def mock_process_feed(feed, s, client, seen):
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
             return next(results_iter)
 
         with caplog.at_level(logging.INFO, logger="runner"):
@@ -409,3 +409,39 @@ class TestRunOnce:
         assert any(
             "Run complete:" in m and "2 feed(s)" in m and "1 with new items" in m and "1 failed" in m for m in messages
         )
+
+
+class TestRunOnceAuth:
+    async def test_passes_token_provider_when_credentials_set(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("REDDIT_CLIENT_ID", "cid")
+        monkeypatch.setenv("REDDIT_CLIENT_SECRET", "csec")
+        config = FeedConfig(name="python", url="https://www.reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        settings = settings.model_copy(update={"reddit_client_id": "cid", "reddit_client_secret": "csec"})
+
+        captured: list = []
+
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+            captured.append(token_provider)
+            return FeedResult(name=feed.name)
+
+        with patch("runner.process_feed", side_effect=mock_process_feed):
+            await run_once(settings)
+
+        assert len(captured) == 1
+        assert captured[0] is not None  # TokenProvider instance
+
+    async def test_omits_token_provider_when_credentials_absent(self, tmp_path):
+        config = FeedConfig(name="python", url="https://www.reddit.com/r/python/.json", fetch_count=5)
+        settings = make_settings(tmp_path, [config])  # credentials default to None
+
+        captured: list = []
+
+        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+            captured.append(token_provider)
+            return FeedResult(name=feed.name)
+
+        with patch("runner.process_feed", side_effect=mock_process_feed):
+            await run_once(settings)
+
+        assert captured == [None]

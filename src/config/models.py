@@ -36,6 +36,8 @@ class Settings(BaseModel):
     log_level: str = "INFO"
     reddit_fetch_gap: float = 2.0
     base_url: str | None = None
+    reddit_client_id: str | None = None
+    reddit_client_secret: str | None = None
 
     @field_validator("feeds")
     @classmethod
