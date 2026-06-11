@@ -42,6 +42,19 @@ def make_seen_store(tmp_path: Path) -> SeenStore:
     return SeenStore(tmp_path / "db")
 
 
+class TestBuildCookies:
+    def test_returns_none_when_no_reddit_session(self):
+        from runner import _build_cookies
+
+        assert _build_cookies(None) is None
+        assert _build_cookies("") is None
+
+    def test_returns_dict_when_reddit_session_present(self):
+        from runner import _build_cookies
+
+        assert _build_cookies("abc-session") == {"reddit_session": "abc-session"}
+
+
 class TestProcessFeed:
     async def test_process_feed_writes_file(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
@@ -81,6 +94,42 @@ class TestProcessFeed:
                 await process_feed(config, settings, client, seen)
 
         assert written_posts == []
+
+    async def test_process_feed_passes_reddit_session_to_extractor(self, tmp_path):
+        """When settings.reddit_session is set, it is passed as the cookies kwarg to extract_media_urls_async."""
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        settings.reddit_session = "abc-session-cookie"
+        seen = make_seen_store(tmp_path)
+        post = make_reddit_post()
+
+        mock_extract = AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
+        with (
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", mock_extract),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client, seen)
+
+        mock_extract.assert_called_once_with(post, cookies={"reddit_session": "abc-session-cookie"})
+
+    async def test_process_feed_no_cookies_when_reddit_session_unset(self, tmp_path):
+        """When settings.reddit_session is None, no cookies kwarg is passed (cookies=None)."""
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        assert settings.reddit_session is None
+        seen = make_seen_store(tmp_path)
+        post = make_reddit_post()
+
+        mock_extract = AsyncMock(return_value=["https://i.redd.it/abc.jpg"])
+        with (
+            patch("runner.fetch_posts", AsyncMock(return_value=[post])),
+            patch("runner.extract_media_urls_async", mock_extract),
+        ):
+            async with httpx.AsyncClient() as client:
+                await process_feed(config, settings, client, seen)
+
+        mock_extract.assert_called_once_with(post, cookies=None)
 
     async def test_process_feed_skips_post_whose_url_is_already_seen(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)

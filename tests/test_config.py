@@ -89,6 +89,14 @@ class TestSettings:
         s = Settings(base_url="https://example.com")
         assert s.base_url == "https://example.com"
 
+    def test_reddit_session_default_is_none(self):
+        s = Settings()
+        assert s.reddit_session is None
+
+    def test_reddit_session_accepts_string(self):
+        s = Settings(reddit_session="abc123def456")
+        assert s.reddit_session == "abc123def456"
+
     def test_duplicate_feed_names_raises(self):
         feeds = [
             FeedConfig(name="python", url="https://reddit.com/r/python/.rss"),
@@ -169,3 +177,22 @@ class TestLoadSettings:
         config.write_text("feeds: []\n")
         settings = load_settings(config)
         assert settings.base_url is None
+
+    def test_reddit_session_loaded_from_yaml(self, tmp_path):
+        config = tmp_path / "config.yaml"
+        config.write_text("reddit_session: secret-cookie-value\nfeeds: []\n")
+        settings = load_settings(config)
+        assert settings.reddit_session == "secret-cookie-value"
+
+    def test_reddit_session_defaults_to_none_when_absent(self, tmp_path):
+        config = tmp_path / "config.yaml"
+        config.write_text("feeds: []\n")
+        settings = load_settings(config)
+        assert settings.reddit_session is None
+
+    def test_env_var_overrides_reddit_session(self, tmp_path, monkeypatch):
+        config = tmp_path / "config.yaml"
+        config.write_text("reddit_session: from-yaml\nfeeds: []\n")
+        monkeypatch.setenv("REDDIT_FEEDS_REDDIT_SESSION", "from-env")
+        settings = load_settings(config)
+        assert settings.reddit_session == "from-env"

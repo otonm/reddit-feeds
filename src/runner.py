@@ -103,9 +103,16 @@ async def process_feed(
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)
         return FeedResult(name=feed.name, failure="fetch error")
 
+    if settings.reddit_session:
+        from media.extractor import _mask  # noqa: PLC0415  (lazy: avoid pulling in on every call)
+
+        logger.debug("[%s] Using reddit_session cookie (%s)", feed.name, _mask(settings.reddit_session))
+
     feed_slug = slugify(feed.name)
     feed_store = FeedStore(settings.db_dir, feed_slug)
     existing_items = await feed_store.load()
+
+    cookies = _build_cookies(settings.reddit_session)
 
     new_items: list[StoredItem] = []
     for post in posts:
@@ -113,7 +120,7 @@ async def process_feed(
             logger.debug("[%s] Skipping post %s: post.url already seen", feed.name, post.id)
             continue
 
-        urls = await extract_media_urls_async(post)
+        urls = await extract_media_urls_async(post, cookies=cookies)
 
         if not urls:
             logger.debug("[%s] Skipping post %s: no media", feed.name, post.id)
@@ -155,6 +162,17 @@ async def process_feed(
         return FeedResult(name=feed.name, new_item_count=len(new_items), failure="write error")
 
     return FeedResult(name=feed.name, new_item_count=len(new_items))
+
+
+def _build_cookies(reddit_session: str | None) -> dict[str, str] | None:
+    """Build the cookies dict passed to the media extractor.
+
+    Returns ``None`` when no authentication is configured so that callers
+    do not need a special code path for "no cookies".
+    """
+    if not reddit_session:
+        return None
+    return {"reddit_session": reddit_session}
 
 
 async def _cleanup_removed_feeds(settings: Settings) -> None:

@@ -8,6 +8,16 @@ db_dir: db/          # Internal database directory, keep this off the web (defau
 # has been deprecated (see https://www.reddit.com/r/modnews/comments/1tq9vxo).
 # If you have an existing config with `.json` URLs, change them to `.rss`.
 
+# Optional: Reddit session cookie for hosted:video and gallery posts.
+# Reddit's WAF blocks datacenter IPs from the JSON API used by gallery-dl and
+# yt-dlp. If you see `gallery-dl aborted extraction for ...` warnings for v.redd.it
+# or gallery posts, set this to a logged-in session cookie value.
+# How to obtain: in your browser, log in to Reddit, open DevTools →
+# Application → Cookies → https://www.reddit.com → copy the value of `reddit_session`.
+# Never commit the value; config.yaml is git-ignored, but a committed example
+# file would be a security risk.
+# reddit_session: ""
+
 # OPML generation (optional)
 # Set base_url to your public hostname to enable feeds.opml generation.
 # On every run, a feeds.opml file is written to output_dir with an <outline> entry

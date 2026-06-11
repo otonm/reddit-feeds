@@ -1,6 +1,6 @@
 # reddit-feeds
 
-Fetches Reddit subreddit RSS feeds, extracts direct media links from posts, and republishes them as RSS 2.0 feeds containing only embedded images, GIFs, and videos. No Reddit credentials, API keys, or authentication required.
+Fetches Reddit subreddit RSS feeds, extracts direct media links from posts, and republishes them as RSS 2.0 feeds containing only embedded images, GIFs, and videos.
 
 Subscribe to any subreddit as a clean media-only RSS feed in any reader.
 
@@ -47,6 +47,7 @@ feeds:
 | `log_level` | string | `INFO` | `DEBUG` / `INFO` / `WARNING` / `ERROR` |
 | `reddit_fetch_gap` | float (seconds) | `2.0` | Minimum delay between Reddit API calls across feeds to reduce rate-limit errors |
 | `base_url` | string | `null` | Public base URL used to construct a `feeds.opml` file to help with importing a lot of feeds at once |
+| `reddit_session` | string | `null` | Optional Reddit session cookie. Required for v.redd.it and gallery posts (Reddit blocks these without auth). See [Authenticating to Reddit](#authenticating-to-reddit). |
 | `feeds[].name` | string | required | Feed name; slugified to produce the output filename |
 | `feeds[].url` | string | required | Reddit subreddit `.rss` URL (e.g. `https://www.reddit.com/r/EarthPorn/.rss`) |
 | `feeds[].fetch_count` | int | `20` | Posts to fetch per run (1–100) |
@@ -60,8 +61,29 @@ Top-level scalar fields can be overridden without editing `config.yaml`:
 | `REDDIT_FEEDS_INTERVAL` | `interval` |
 | `REDDIT_FEEDS_LOG_LEVEL` | `log_level` |
 | `REDDIT_FEEDS_FETCH_GAP` | `reddit_fetch_gap` |
+| `REDDIT_FEEDS_REDDIT_SESSION` | `reddit_session` |
 
 Environment variables take precedence over `config.yaml`.
+
+---
+
+## Authenticating to Reddit
+
+Required only if you subscribe to subreddits with v.redd.it videos or gallery posts and they fail to appear in the feed. Reddit blocks unauthenticated requests for these post types.
+
+1. Log in to Reddit in your browser.
+2. Open DevTools → Application → Cookies → `https://www.reddit.com`.
+3. Copy the value of the `reddit_session` cookie.
+4. Set it as an environment variable, or in `config.yaml`:
+   ```bash
+   REDDIT_FEEDS_REDDIT_SESSION=<long-cookie-value>
+   ```
+   ```yaml
+   reddit_session: "<long-cookie-value>"
+   ```
+5. Restart the container.
+
+The value is never logged in full (debug logs show only the first 4 characters).
 
 ---
 
@@ -108,6 +130,7 @@ docker pull ghcr.io/otonm/reddit-feeds:latest
 ```bash
 docker run -d \
   --name reddit-feeds \
+  -e REDDIT_FEEDS_REDDIT_SESSION="$REDDIT_COOKIE"   # optional — see Authenticating to Reddit
   -v $(pwd)/config.yaml:/app/config.yaml:ro \
   -v $(pwd)/output:/app/output \
   -v $(pwd)/db:/app/db \

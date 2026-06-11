@@ -11,9 +11,15 @@ Reddit RSS feed
  reddit/client.py      — HTTP GET with httpx, parses Atom 1.0 via feedparser
        │
        ▼
- media/extractor.py    — gallery-dl resolves direct media URLs per post
-       │                (passes the post permalink for v.redd.it / gallery posts
-       │                 so gallery-dl can fetch the post page and resolve them)
+ media/extractor.py    — per post:
+       │                  1. if URL is direct media (i.redd.it/foo.jpg etc.) → use as-is
+       │                  2. if post_hint == "hosted:video" → yt-dlp resolves the
+       │                     direct .mp4 from the DASH/HLS manifest
+       │                  3. else (galleries, embeds, redirects) → gallery-dl
+       │                     resolves media URLs from the post permalink
+       │                  All three paths accept an optional cookies dict
+       │                  (forwarded from settings.reddit_session) to bypass
+       │                  Reddit's WAF block on datacenter IPs.
        ▼
  store/seen_store.py   — two-level dedup: post.url pre-filter + per-media-URL filter
  store/feed_store.py   — load existing items, append new ones, persist to db_dir
@@ -32,7 +38,7 @@ Posts with no resolvable media are silently skipped. Posts whose `post.url` is a
 | Module | Role |
 |--------|------|
 | `src/reddit/client.py` | Fetches posts from Reddit's public `.rss` Atom feed (the JSON endpoint is deprecated — see https://www.reddit.com/r/modnews/comments/1tq9vxo); parses with feedparser; infers `post_hint` and `is_gallery` from URL patterns; retries up to 2× on 429/403, honouring the `Retry-After` header (falls back to 2 s / 4 s exponential backoff) |
-| `src/media/extractor.py` | Uses gallery-dl (1000+ supported sites) to resolve direct media URLs; for v.redd.it and gallery posts, passes the post permalink (not the bare media URL) so gallery-dl can fetch the post page; runs in a thread pool via `run_in_executor` to avoid blocking the event loop |
+| `src/media/extractor.py` | Three-way dispatch per post: (a) direct media URL (`i.redd.it/foo.jpg`) → use as-is, (b) `hosted:video` → `_try_yt_dlp` (yt-dlp resolves the DASH/HLS manifest to a direct `.mp4`; uses `post.permalink` so yt-dlp can authenticate against the post page), (c) everything else (galleries, embeds, redirects) → gallery-dl on the post permalink. All three paths accept an optional `cookies: dict[str, str]`; when `Settings.reddit_session` is set, the runner builds `{"reddit_session": value}` and passes it through (gallery-dl: `extractor.reddit.cookies`; yt-dlp: temp Mozilla cookies.txt via `cookiefile`). The yt-dlp import is lazy so image-only feeds don't pay the import cost. For gallery-dl failures, `AbortExtraction` is special-cased to a one-line WARNING; full payload is at DEBUG. Runs in a thread pool via `run_in_executor` to avoid blocking the event loop. |
 | `src/store/models.py` | `StoredItem` dataclass — the persistent feed item representation; serialises to/from JSON |
 | `src/store/seen_store.py` | `SeenStore` — global in-memory `set[str]` of seen `post.url` + media URLs; backed by `{db_dir}/seen.json`; shared across all feeds within a cycle |
 | `src/store/feed_store.py` | `FeedStore` — per-feed ordered list of `StoredItem` backed by `{db_dir}/{slug}.json`; loaded at the start of each feed cycle and saved after new items are appended |
@@ -41,7 +47,7 @@ Posts with no resolvable media are silently skipped. Posts whose `post.url` is a
 | `src/feed/opml.py` | Builds OPML 2.0 XML index from all configured feeds (`build_opml`) and writes `feeds.opml` to `output_dir` (`write_opml`); only called when `base_url` is set |
 | `src/runner.py` | Orchestrates one full cycle: cleans up orphaned files for removed feeds, loads `SeenStore`, launches feeds with `reddit_fetch_gap` stagger between Reddit calls, saves `SeenStore`, touches `/tmp/reddit-feeds.last_run` |
 | `src/cli.py` | Typer CLI; one-shot and daemon mode; configures logging |
-| `src/config/` | Pydantic models + YAML loader; env var overrides for `interval`, `log_level`, and `reddit_fetch_gap`; `output_dir` and `db_dir` are config-file-only (env overrides removed to prevent silently bypassing Docker volume mounts); `FeedConfig.url` validator requires `.rss` |
+| `src/config/` | Pydantic models + YAML loader; env var overrides for `interval`, `log_level`, `reddit_fetch_gap`, and `reddit_session`; `output_dir` and `db_dir` are config-file-only (env overrides removed to prevent silently bypassing Docker volume mounts); `FeedConfig.url` validator requires `.rss` |
 
 ## Docker image
 
@@ -81,7 +87,7 @@ Tests use pytest-asyncio and pytest-httpx; no external services required. All as
 | `httpx` | Async HTTP client for Reddit RSS |
 | `feedparser` | Atom 1.0 feed parser (Python stdlib `email.utils` handles RFC 2822 dates as a fallback) |
 | `gallery-dl` | Media URL extraction (1000+ sites); moved its canonical repo to https://codeberg.org/mikf/gallery-dl but PyPI distribution is unchanged |
-| `yt-dlp` | Required by gallery-dl for hosted video (v.redd.it) DASH/HLS URL extraction |
+| `yt-dlp` | Used directly by `media/extractor.py` for `hosted:video` posts (DASH/HLS manifest → direct `.mp4` URL); also used internally by gallery-dl |
 | `feedgen` | RSS 2.0 feed generation |
 | `pyyaml` | Config file parsing (`safe_load` only) |
 | `pydantic` | Config model validation |
