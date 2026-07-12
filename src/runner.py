@@ -16,7 +16,7 @@ from feed.builder import build_feed
 from feed.opml import build_opml, write_opml
 from feed.writer import write_feed
 from media.extractor import extract_media_urls_async
-from reddit.client import fetch_posts
+from reddit.client import FeedFetchError, fetch_posts
 from store.feed_store import FeedStore
 from store.models import StoredItem
 from store.seen_store import SeenStore
@@ -43,12 +43,13 @@ async def run_once(settings: Settings) -> list[FeedResult]:
     feed_names = [f.name for f in settings.feeds]
     logger.info("Starting run: %d feed(s): %s", len(settings.feeds), ", ".join(feed_names))
     t0 = time.monotonic()
+    semaphore = asyncio.Semaphore(2)  # ponytail: global lock; per-subdomain semaphores if Reddit gets granular
     async with httpx.AsyncClient() as client:
         tasks = []
         for i, feed in enumerate(settings.feeds):
             if i > 0 and settings.reddit_fetch_gap > 0:
                 await asyncio.sleep(settings.reddit_fetch_gap)
-            tasks.append(asyncio.create_task(process_feed(feed, settings, client, seen)))
+            tasks.append(asyncio.create_task(process_feed(feed, settings, client, seen, semaphore)))
         gather_results = await asyncio.gather(*tasks, return_exceptions=True)
 
     results: list[FeedResult] = []
@@ -93,12 +94,23 @@ async def process_feed(
     settings: Settings,
     client: httpx.AsyncClient,
     seen: SeenStore,
+    semaphore: asyncio.Semaphore | None = None,
 ) -> FeedResult:
     """Fetch, deduplicate, merge, and write a single feed incrementally."""
     logger.info("[%s] Fetching %d posts from %s", feed.name, feed.fetch_count, feed.url)
     try:
-        posts = await fetch_posts(feed.url, feed.fetch_count, client)
+        if semaphore:
+            async with semaphore:
+                posts = await fetch_posts(feed.url, feed.fetch_count, client)
+        else:
+            posts = await fetch_posts(feed.url, feed.fetch_count, client)
         logger.debug("[%s] Received %d posts from Reddit", feed.name, len(posts))
+    except FeedFetchError as e:
+        if e.permanent:
+            logger.warning("[%s] Blocked by Reddit (HTTP %d): %s", feed.name, e.status_code, e.url)
+            return FeedResult(name=feed.name, failure=f"blocked (HTTP {e.status_code})")
+        logger.warning("[%s] Rate limited by Reddit (HTTP 429): %s", feed.name, e.url)
+        return FeedResult(name=feed.name, failure="rate limited")
     except (httpx.HTTPError, KeyError, ValueError):
         logger.warning("[%s] Failed to fetch posts", feed.name, exc_info=True)
         return FeedResult(name=feed.name, failure="fetch error")

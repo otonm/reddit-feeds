@@ -1,3 +1,4 @@
+import asyncio
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
@@ -6,6 +7,7 @@ import httpx
 from slugify import slugify
 
 from config.models import FeedConfig, Settings
+from reddit.client import FeedFetchError
 from reddit.models import RedditPost
 from runner import FeedResult, process_feed, run_once
 from store.feed_store import FeedStore
@@ -248,6 +250,28 @@ class TestProcessFeed:
         assert result.name == "python"
         assert result.failure == "fetch error"
 
+    async def test_process_feed_rate_limited_returns_specific_failure(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
+
+        with patch("runner.fetch_posts", AsyncMock(side_effect=FeedFetchError(config.url, 429))):
+            async with httpx.AsyncClient() as client:
+                result = await process_feed(config, settings, client, seen)
+
+        assert result.failure == "rate limited"
+
+    async def test_process_feed_blocked_returns_specific_failure(self, tmp_path):
+        config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        settings = make_settings(tmp_path, [config])
+        seen = make_seen_store(tmp_path)
+
+        with patch("runner.fetch_posts", AsyncMock(side_effect=FeedFetchError(config.url, 403))):
+            async with httpx.AsyncClient() as client:
+                result = await process_feed(config, settings, client, seen)
+
+        assert result.failure == "blocked (HTTP 403)"
+
     async def test_process_feed_write_failure_does_not_raise(self, tmp_path):
         config = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [config])
@@ -285,7 +309,7 @@ class TestCleanupRemovedFeeds:
         seen_json = db_dir / "seen.json"
         seen_json.write_text("[]")
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             pass
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -309,7 +333,7 @@ class TestCleanupRemovedFeeds:
         kept_xml.write_text("<rss/>")
         kept_json.write_text("[]")
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             pass
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -327,7 +351,7 @@ class TestRunOnce:
 
         processed: list[str] = []
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             processed.append(feed.name)
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -343,7 +367,7 @@ class TestRunOnce:
 
         processed: list[str] = []
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             processed.append(feed.name)
             if feed.name == "python":
                 msg = "python feed exploded"
@@ -358,7 +382,7 @@ class TestRunOnce:
     async def test_run_once_saves_seen_store(self, tmp_path):
         settings = make_settings(tmp_path)
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             seen.add("https://i.redd.it/tracked.jpg")
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -421,7 +445,7 @@ class TestRunOnce:
         feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
         settings = make_settings(tmp_path, [feed1])
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             return FeedResult(name=feed.name, new_item_count=2)
 
         with patch("runner.process_feed", side_effect=mock_process_feed):
@@ -445,7 +469,7 @@ class TestRunOnce:
         ]
         results_iter = iter(results)
 
-        async def mock_process_feed(feed, s, client, seen, token_provider=None):
+        async def mock_process_feed(feed, s, client, seen, semaphore=None):
             return next(results_iter)
 
         with caplog.at_level(logging.INFO, logger="runner"):
@@ -458,3 +482,29 @@ class TestRunOnce:
         assert any(
             "Run complete:" in m and "2 feed(s)" in m and "1 with new items" in m and "1 failed" in m for m in messages
         )
+
+    async def test_run_once_limits_concurrent_reddit_requests(self, tmp_path):
+        feed1 = FeedConfig(name="python", url="https://reddit.com/r/python/.rss", fetch_count=5)
+        feed2 = FeedConfig(name="rust", url="https://reddit.com/r/rust/.rss", fetch_count=5)
+        feed3 = FeedConfig(name="go", url="https://reddit.com/r/golang/.rss", fetch_count=5)
+        settings = make_settings(tmp_path, [feed1, feed2, feed3])
+
+        concurrent_count = 0
+        max_concurrent = 0
+
+        async def mock_fetch_posts(url, limit, client):
+            nonlocal concurrent_count, max_concurrent
+            concurrent_count += 1
+            max_concurrent = max(max_concurrent, concurrent_count)
+            await asyncio.sleep(0.01)
+            concurrent_count -= 1
+            return []
+
+        with (
+            patch("runner.process_feed", wraps=process_feed),
+            patch("runner.fetch_posts", side_effect=mock_fetch_posts),
+            patch("runner.extract_media_urls_async", AsyncMock(return_value=[])),
+        ):
+            await run_once(settings)
+
+        assert max_concurrent <= 2

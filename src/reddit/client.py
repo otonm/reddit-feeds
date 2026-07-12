@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import random
 import re
 from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
@@ -14,8 +15,9 @@ from reddit.models import RedditPost
 
 USER_AGENT = "python:reddit-feeds:0.1.0 (by /u/reddit-feeds-bot)"
 TIMEOUT = 15.0
-_MAX_RETRIES = 2
+_MAX_RETRIES = 5
 _RETRY_BASE_DELAY = 2.0
+_RETRY_MAX_DELAY = 120.0
 _HTTP_TOO_MANY_REQUESTS = 429
 _HTTP_FORBIDDEN = 403
 
@@ -23,6 +25,21 @@ _IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 _VIDEO_EXTS = (".mp4", ".webm", ".mov")
 
 _LINK_HREF_RE = re.compile(r'href="([^"]+)"\s*>\s*\[link\]')
+
+
+class FeedFetchError(RuntimeError):
+    """Raised when fetching a Reddit feed fails after exhausting retries."""
+
+    def __init__(self, url: str, status_code: int, message: str = "") -> None:
+        self.url = url
+        self.status_code = status_code
+        self.permanent = status_code != _HTTP_TOO_MANY_REQUESTS
+        super().__init__(message or f"Feed fetch failed: {url} ({status_code})")
+
+
+def _jitter(delay: float) -> float:
+    """Add ±25% jitter to a delay to break thundering-herd retry alignment."""
+    return delay * (0.75 + random.random() * 0.5)
 
 
 def _user_agent() -> str:
@@ -153,10 +170,17 @@ async def fetch_posts(
 
         if response.status_code in (_HTTP_TOO_MANY_REQUESTS, _HTTP_FORBIDDEN) and attempt < _MAX_RETRIES:
             retry_after = response.headers.get("Retry-After")
-            delay = float(retry_after) if retry_after else _RETRY_BASE_DELAY * (2**attempt)
+            if retry_after is not None:
+                delay = min(float(retry_after), _RETRY_MAX_DELAY)
+            elif response.status_code == _HTTP_TOO_MANY_REQUESTS:
+                delay = min(_RETRY_BASE_DELAY * (2**attempt), _RETRY_MAX_DELAY)
+            else:
+                delay = _RETRY_BASE_DELAY
+            delay = _jitter(delay)
             logger.warning(
-                "Reddit returned %d (attempt %d/%d), retrying in %.0fs",
+                "Reddit returned %d for %s (attempt %d/%d), retrying in %.0fs",
                 response.status_code,
+                url,
                 attempt + 1,
                 _MAX_RETRIES + 1,
                 delay,
@@ -164,14 +188,15 @@ async def fetch_posts(
             await asyncio.sleep(delay)
             continue
 
-        response.raise_for_status()
-        parsed = feedparser.parse(response.text)
-        posts = [_parse_entry(entry) for entry in parsed.entries]
-        logger.info("Fetched %d post(s) from %s", len(posts), url)
-        return posts
+        if response.is_success:
+            parsed = feedparser.parse(response.text)
+            posts = [_parse_entry(entry) for entry in parsed.entries]
+            logger.info("Fetched %d post(s) from %s", len(posts), url)
+            return posts
 
-    msg = "fetch_posts: unreachable"  # pragma: no cover
-    raise RuntimeError(msg)  # pragma: no cover
+        raise FeedFetchError(url, response.status_code)
+
+    raise FeedFetchError(url, _HTTP_TOO_MANY_REQUESTS, f"Exhausted {_MAX_RETRIES + 1} attempts")  # pragma: no cover
 
 
 logger = logging.getLogger(__name__)

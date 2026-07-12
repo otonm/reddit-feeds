@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pytest_httpx import HTTPXMock
 
-from reddit.client import _MAX_RETRIES, _parse_entry, _user_agent, fetch_posts
+from reddit.client import _MAX_RETRIES, _parse_entry, _user_agent, FeedFetchError, fetch_posts
 
 SAMPLE_ENTRY_IMAGE = {
     "id": "t3_abc123",
@@ -195,8 +195,10 @@ class TestFetchPosts:
             httpx_mock.add_response(status_code=429)
         with patch("asyncio.sleep", new_callable=AsyncMock):
             async with httpx.AsyncClient() as client:
-                with pytest.raises(httpx.HTTPStatusError):
+                with pytest.raises(FeedFetchError) as exc_info:
                     await fetch_posts("https://reddit.com/r/python/.rss", 10, client)
+        assert exc_info.value.status_code == 429
+        assert not exc_info.value.permanent
 
     async def test_fetch_posts_retries_on_429_then_succeeds(self, httpx_mock: HTTPXMock, rss_response_xml):
         httpx_mock.add_response(status_code=429)
@@ -212,14 +214,15 @@ class TestFetchPosts:
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             async with httpx.AsyncClient() as client:
                 await fetch_posts("https://reddit.com/r/python/.rss", 10, client)
-        mock_sleep.assert_called_once_with(30.0)
+        delay = mock_sleep.call_args[0][0]
+        assert 22.5 <= delay <= 45.0  # jitter: 30 * 0.75 to 30 * 1.25
 
     async def test_fetch_posts_sleep_count_matches_retries(self, httpx_mock: HTTPXMock):
         for _ in range(_MAX_RETRIES + 1):
             httpx_mock.add_response(status_code=429)
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             async with httpx.AsyncClient() as client:
-                with pytest.raises(httpx.HTTPStatusError):
+                with pytest.raises(FeedFetchError):
                     await fetch_posts("https://reddit.com/r/python/.rss", 10, client)
         assert mock_sleep.call_count == _MAX_RETRIES
 
@@ -247,21 +250,24 @@ class TestFetchPosts403Retry:
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             async with httpx.AsyncClient() as client:
                 await fetch_posts("https://reddit.com/r/python/.rss", 10, client)
-        mock_sleep.assert_called_once_with(5.0)
+        delay = mock_sleep.call_args[0][0]
+        assert 3.75 <= delay <= 6.25  # jitter: 5 * 0.75 to 5 * 1.25
 
     async def test_403_raises_after_retries_exhausted(self, httpx_mock: HTTPXMock):
         for _ in range(_MAX_RETRIES + 1):
             httpx_mock.add_response(status_code=403)
         with patch("asyncio.sleep", new_callable=AsyncMock):
             async with httpx.AsyncClient() as client:
-                with pytest.raises(httpx.HTTPStatusError):
+                with pytest.raises(FeedFetchError) as exc_info:
                     await fetch_posts("https://reddit.com/r/python/.rss", 10, client)
+        assert exc_info.value.status_code == 403
+        assert exc_info.value.permanent
 
     async def test_403_sleep_count_matches_retries(self, httpx_mock: HTTPXMock):
         for _ in range(_MAX_RETRIES + 1):
             httpx_mock.add_response(status_code=403)
         with patch("asyncio.sleep", new_callable=AsyncMock) as mock_sleep:
             async with httpx.AsyncClient() as client:
-                with pytest.raises(httpx.HTTPStatusError):
+                with pytest.raises(FeedFetchError):
                     await fetch_posts("https://reddit.com/r/python/.rss", 10, client)
         assert mock_sleep.call_count == _MAX_RETRIES
